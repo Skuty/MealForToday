@@ -1,3 +1,5 @@
 <Solution>
+  <Project Path="src/MealForToday.Application/MealForToday.Application.csproj" Id="a3866cda-d035-4aa5-9af8-2262a453fc6e" />
   <Project Path="src/MealForToday.UI/MealForToday.UI.csproj" Id="bfb2bedf-d277-41c0-ad3f-d3f9d1e9477d" />
+  <Project Path="tests/MealForToday.Application.Tests/MealForToday.Application.Tests.csproj" Id="bc900ba8-284f-473f-9ada-688156b6f3ba" />
 </Solution>
