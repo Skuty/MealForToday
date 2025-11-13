@@ -55,7 +55,7 @@ namespace MealForToday.UI
                 app.UseHsts();
             }
 
-            app.UseHttpsRedirection();
+            // app.UseHttpsRedirection();
 
             app.UseAntiforgery();
 
