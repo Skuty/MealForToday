@@ -1,0 +1,58 @@
+@page "/schedules"
+@using MealForToday.Application.Models
+@inject MealForToday.Application.Services.IScheduleService ScheduleService
+
+<h3>Schedule Generator</h3>
+
+<div class="mb-3">
+    <label class="form-label">Start Date</label>
+    <input type="date" class="form-control" @bind="startDateString" />
+    <label class="form-label mt-2">End Date</label>
+    <input type="date" class="form-control" @bind="endDateString" />
+    <label class="form-label mt-2">Meals per day</label>
+    <input type="number" class="form-control" @bind="mealsPerDay" min="1" max="10" />
+    <button class="btn btn-primary mt-2" @onclick="Generate">Generate</button>
+    <button class="btn btn-success mt-2 ms-2" @onclick="Save" disabled="@(!canSave)">Save Schedule</button>
+</div>
+
+@if (generatedSchedule != null)
+{
+    <h4>Generated Schedule</h4>
+    @foreach (var g in generatedSchedule.ScheduleEntries.GroupBy(e => e.Date).OrderBy(g => g.Key))
+    {
+        <div class="card mb-2">
+            <div class="card-body">
+                <h5>@g.Key.ToShortDateString()</h5>
+                <ul>
+                    @foreach (var entry in g)
+                    {
+                        <li>@entry.Meal?.Name ?? entry.MealId.ToString()</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private string startDateString = DateTime.Today.ToString("yyyy-MM-dd");
+    private string endDateString = DateTime.Today.ToString("yyyy-MM-dd");
+    private int mealsPerDay = 3;
+    private MealSchedule? generatedSchedule;
+    private bool canSave = false;
+
+    private async Task Generate()
+    {
+        var start = DateTime.Parse(startDateString);
+        var end = DateTime.Parse(endDateString);
+        generatedSchedule = await ScheduleService.GenerateScheduleAsync(start, end, mealsPerDay);
+        canSave = generatedSchedule != null && generatedSchedule.ScheduleEntries.Any();
+    }
+
+    private async Task Save()
+    {
+        if (generatedSchedule == null) return;
+        await ScheduleService.SaveAsync(generatedSchedule);
+        canSave = false;
+    }
+}
