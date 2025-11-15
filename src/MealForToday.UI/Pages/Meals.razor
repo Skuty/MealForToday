@@ -1,0 +1,105 @@
+@page "/meals"
+@using MealForToday.Application.Models
+@inject MealForToday.Application.Services.IMealService MealService
+
+<h3>Meals</h3>
+
+<div class="mb-3">
+    <label class="form-label">Name</label>
+    <input class="form-control" @bind="newName" />
+    <label class="form-label mt-2">Description</label>
+    <input class="form-control" @bind="newDescription" />
+    <label class="form-label mt-2">Ingredients (one per line: name|quantity|unit)</label>
+    <textarea class="form-control" rows="4" @bind="newIngredientsText"></textarea>
+    <button class="btn btn-primary mt-2" @onclick="CreateMeal">Create Meal</button>
+</div>
+
+<h4>Preferred Meals</h4>
+@if (meals == null)
+{
+    <p>Loading...</p>
+}
+else if (!meals.Any())
+{
+    <p>No meals yet.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr><th>Name</th><th>Description</th><th>Ingredients</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var m in meals)
+            {
+                <tr>
+                    <td>@m.Name</td>
+                    <td>@m.Description</td>
+                    <td>
+                        @if (m.Ingredients?.Any() ?? false)
+                        {
+                            <ul>
+                                @foreach (var i in m.Ingredients)
+                                {
+                                    <li>@(i.Ingredient?.Name ?? "Unknown") - @i.Quantity @i.Unit</li>
+                                }
+                            </ul>
+                        }
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" @onclick="(() => DeleteMeal(m.Id))">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Meal>? meals;
+    private string newName = string.Empty;
+    private string newDescription = string.Empty;
+    private string newIngredientsText = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        meals = await MealService.GetAllAsync();
+    }
+
+    private async Task CreateMeal()
+    {
+        var meal = new Meal
+        {
+            Name = newName,
+            Description = newDescription
+        };
+
+        var lines = (newIngredientsText ?? string.Empty).Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            var parts = line.Split('|');
+            var name = parts.Length > 0 ? parts[0].Trim() : string.Empty;
+            decimal qty = 0;
+            if (parts.Length > 1) decimal.TryParse(parts[1].Trim(), out qty);
+            var unit = parts.Length > 2 ? parts[2].Trim() : string.Empty;
+            meal.Ingredients.Add(new MealIngredient
+            {
+                Ingredient = new Ingredient { Name = name },
+                Quantity = qty,
+                Unit = unit
+            });
+        }
+
+        await MealService.CreateAsync(meal);
+        newName = string.Empty;
+        newDescription = string.Empty;
+        newIngredientsText = string.Empty;
+        meals = await MealService.GetAllAsync();
+    }
+
+    private async Task DeleteMeal(Guid id)
+    {
+        await MealService.DeleteAsync(id);
+        meals = await MealService.GetAllAsync();
+    }
+}
