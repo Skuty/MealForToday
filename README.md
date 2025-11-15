@@ -33,6 +33,25 @@ Run unit tests:
 dotnet test
 ```
 
+## Deployment (Testing Features from PRs)
+
+You can deploy the application from any PR branch for testing without building locally. See [DEPLOYMENT.md](DEPLOYMENT.md) for complete instructions.
+
+### Quick Start
+
+1. Go to **Actions** → **Manual Deploy to Test Environment**
+2. Select your PR branch and click **Run workflow**
+3. The workflow builds a Docker image and pushes it to GitHub Container Registry
+4. Deploy locally or to cloud:
+
+```bash
+# Pull and run locally
+docker pull ghcr.io/skuty/mealfortoday:<your-branch>
+docker run -d -p 8080:8080 ghcr.io/skuty/mealfortoday:<your-branch>
+```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for Azure Container Apps and Azure Web App deployment options.
+
 ## What I implemented (MVP)
 
 - Domain models: `Meal`, `Ingredient`, `MealIngredient`, `MealSchedule`, `ScheduleEntry`.
