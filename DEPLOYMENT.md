@@ -4,13 +4,37 @@ This document describes how to deploy MealForToday application for testing purpo
 
 ## Overview
 
-The manual deployment workflow builds a Docker image from your PR branch and pushes it to GitHub Container Registry (GHCR). You can then deploy this image to various environments for testing without needing to build the application locally.
+The manual deployment workflow builds a Docker image from your PR branch and pushes it to GitHub Container Registry (GHCR). You can deploy this image to Azure Container Apps automatically or to various other environments manually.
 
 ## Prerequisites
 
 - GitHub account with access to this repository
-- (Optional) Azure account for cloud deployment
+- (Optional) Azure account for automated cloud deployment - see [AZURE-SETUP.md](AZURE-SETUP.md)
 - (Optional) Docker installed locally for self-hosted deployment
+
+## Quick Start: Automated Azure Deployment
+
+For the fastest deployment experience with auto-scaling and automatic cleanup:
+
+1. **One-time setup**: Configure Azure authentication following [AZURE-SETUP.md](AZURE-SETUP.md)
+2. Navigate to **Actions** → **"Manual Deploy to Test Environment"**
+3. Click **"Run workflow"**
+4. Configure:
+   - **Action**: `deploy`
+   - **Environment**: `test` or `staging`
+   - **Deploy to Azure**: ✅ (checked)
+   - **Branch**: Select your branch
+5. Click **"Run workflow"**
+
+The workflow will:
+- Build and push Docker image to GHCR
+- Deploy to Azure Container Apps with auto-scaling (0-1 replicas)
+- Provide the application URL
+- Post deployment info as PR comment (if triggered from PR)
+
+**To cleanup**: Run workflow with **Action**: `cleanup`
+
+See [Option 2: Automated Azure Container Apps Deployment](#option-2-automated-azure-container-apps-deployment) below for details.
 
 ## Manual Deployment Workflow
 
@@ -20,14 +44,17 @@ The manual deployment workflow builds a Docker image from your PR branch and pus
 2. Select **"Manual Deploy to Test Environment"** workflow
 3. Click **"Run workflow"** button
 4. Select:
+   - **Action**: `deploy` (to deploy) or `cleanup` (to remove deployment)
    - **Branch**: Choose your PR branch or any branch you want to deploy
    - **Environment**: Select `test` or `staging`
+   - **Deploy to Azure**: Check this to deploy to Azure Container Apps automatically
    - **PR Number** (optional): The PR number if deploying from a PR branch
 5. Click **"Run workflow"**
 
 The workflow will:
-- Build a Docker image from your branch
+- Build a Docker image from your branch (if action is `deploy`)
 - Push it to GitHub Container Registry (GHCR) at `ghcr.io/skuty/mealfortoday`
+- Deploy to Azure Container Apps if selected
 - Generate deployment instructions in the workflow summary
 
 ### Accessing the Docker Image
@@ -106,7 +133,99 @@ docker-compose logs -f
 docker-compose down
 ```
 
-### Option 2: Azure Container Apps (Recommended for Cloud)
+### Option 2: Automated Azure Container Apps Deployment
+
+**Recommended for cloud testing with auto-scaling to zero.**
+
+Azure Container Apps deployment is now automated through the GitHub Actions workflow with built-in auto-scaling and cleanup.
+
+#### Features
+- ✅ **Automated deployment**: One-click deployment from GitHub Actions
+- ✅ **Auto-scaling to 0**: Scales to zero when idle (saves costs)
+- ✅ **Auto-scaling up**: Automatically handles traffic when it arrives
+- ✅ **Automatic cleanup**: Remove deployments with cleanup action
+- ✅ **Free tier friendly**: Optimized for 180k vCPU-seconds/month quota
+
+#### One-Time Setup
+
+Follow the [AZURE-SETUP.md](AZURE-SETUP.md) guide to:
+1. Create Azure AD Application
+2. Configure federated identity credentials
+3. Assign Azure permissions
+4. Add GitHub secrets (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`)
+
+#### Deploy to Azure
+
+1. Go to **Actions** → **"Manual Deploy to Test Environment"**
+2. Click **"Run workflow"**
+3. Configure:
+   - **Action**: `deploy`
+   - **Environment**: `test` or `staging`
+   - **Deploy to Azure**: ✅ (checked)
+   - **Branch**: Select your branch
+4. Click **"Run workflow"**
+
+The workflow will:
+- Build and push Docker image to GHCR
+- Create Azure resources (resource group, container app environment) if needed
+- Deploy container app with configuration:
+  - **Auto-scaling**: 0-1 replicas (scales to zero when idle)
+  - **Resources**: 0.25 vCPU, 0.5Gi memory
+  - **Ingress**: External HTTPS endpoint
+  - **Image**: Latest from your branch
+- Provide the application URL (e.g., `https://mealfortoday-test-mybranch.region.azurecontainerapps.io`)
+
+#### Cleanup Azure Deployment
+
+When done testing, remove the deployment:
+
+1. Go to **Actions** → **"Manual Deploy to Test Environment"**
+2. Click **"Run workflow"**
+3. Configure:
+   - **Action**: `cleanup`
+   - **Environment**: Same as deployment (e.g., `test`)
+   - **Branch**: Same branch you deployed
+4. Click **"Run workflow"**
+
+The workflow will:
+- Delete the container app
+- Delete the resource group if no other resources remain
+- Free up your Azure resources
+
+#### Resource Naming
+
+Resources are automatically named:
+- **Resource Group**: `mealfortoday-{environment}-rg`
+- **Container App Environment**: `mealfortoday-{environment}-env`
+- **Container App**: `mealfortoday-{environment}-{branch-name}`
+
+Example for branch `feature/ui-updates` in `test` environment:
+- Container App: `mealfortoday-test-feature-ui-updates`
+
+#### Auto-Scaling Details
+
+The deployment uses Azure Container Apps' built-in auto-scaling:
+
+```yaml
+Min replicas: 0    # Scales to zero when no traffic
+Max replicas: 1    # Scales to 1 when traffic arrives
+CPU: 0.25 vCPU     # Per instance
+Memory: 0.5Gi      # Per instance
+```
+
+**Behavior:**
+- **No traffic**: Automatically scales to 0 replicas (no cost)
+- **Traffic arrives**: Scales to 1 replica in ~2-5 seconds
+- **Traffic stops**: Scales back to 0 after idle period (~1-2 minutes)
+
+**Cost impact:**
+- Only charged for actual usage time
+- ~3+ hours of testing per day within free tier
+- $0 when idle (scaled to zero)
+
+### Option 3: Manual Azure Container Apps (Advanced)
+
+If you prefer manual control or want to customize the deployment, you can use Azure CLI directly.
 
 Azure Container Apps provides a free tier suitable for testing and development.
 

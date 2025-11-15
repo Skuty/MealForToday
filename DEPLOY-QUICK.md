@@ -2,14 +2,45 @@
 
 This is a quick reference for deploying your PR branch for testing.
 
-## TL;DR - Deploy My PR for Testing
+## TL;DR - Deploy My PR to Azure (Recommended)
 
-1. **Trigger Deployment**:
+**One-time setup**: Follow [AZURE-SETUP.md](AZURE-SETUP.md) to configure Azure authentication.
+
+1. **Deploy**:
    - Go to [Actions → Manual Deploy to Test Environment](../../actions/workflows/manual-deploy.yml)
    - Click "Run workflow"
-   - Select your PR branch
-   - Choose environment: `test`
-   - Click "Run workflow" button
+   - Configure:
+     - Action: `deploy`
+     - Environment: `test`
+     - Deploy to Azure: ✅ (checked)
+     - Branch: Your PR branch
+   - Click "Run workflow"
+
+2. **Wait for Deployment** (~3-5 minutes):
+   - Workflow builds and deploys to Azure
+   - Auto-configured with HTTPS endpoint
+   - Auto-scales to 0 when idle (saves costs)
+
+3. **Access Your App**:
+   - Get URL from workflow summary or PR comment
+   - Example: `https://mealfortoday-test-mybranch.azurecontainerapps.io`
+   - Use demo credentials (see below)
+
+4. **Cleanup When Done**:
+   - Run workflow again with Action: `cleanup`
+   - Removes all Azure resources for your branch
+
+## Alternative: Deploy Locally with Docker
+
+1. **Trigger Build**:
+   - Go to [Actions → Manual Deploy to Test Environment](../../actions/workflows/manual-deploy.yml)
+   - Click "Run workflow"
+   - Configure:
+     - Action: `deploy`
+     - Environment: `test`
+     - Deploy to Azure: ❌ (unchecked)
+     - Branch: Your PR branch
+   - Click "Run workflow"
 
 2. **Wait for Build** (~3-5 minutes):
    - Workflow builds Docker image
@@ -29,14 +60,20 @@ This is a quick reference for deploying your PR branch for testing.
 
 ## When to Use This
 
-✅ **Use manual deployment when:**
-- Testing features that require a full running application
-- Sharing your work with non-technical reviewers
-- Testing on different environments/platforms
-- Avoiding local build/setup issues
-- Need to test integration or UI features
+✅ **Use automated Azure deployment when:**
+- Want quick cloud testing without Docker setup
+- Sharing with non-technical reviewers (just send URL)
+- Testing from mobile/tablet devices
+- Need HTTPS endpoint for testing
+- Want auto-scaling and cost optimization
 
-❌ **Don't use it when:**
+✅ **Use local Docker deployment when:**
+- Testing locally before sharing
+- Don't have Azure configured yet
+- Prefer local control
+- Testing offline scenarios
+
+❌ **Don't use deployment when:**
 - Making simple code changes (use Codespaces or local dev)
 - Running unit tests (use `dotnet test` locally or in Codespaces)
 - First time testing - try local `dotnet run` first

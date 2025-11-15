@@ -37,12 +37,26 @@ dotnet test
 
 You can deploy the application from any PR branch for testing without building locally. See [DEPLOYMENT.md](DEPLOYMENT.md) for complete instructions.
 
-### Quick Start
+### Automated Azure Deployment (Recommended)
+
+Deploy to Azure Container Apps with auto-scaling to zero:
+
+1. **One-time setup**: Configure Azure auth following [AZURE-SETUP.md](AZURE-SETUP.md)
+2. Go to **Actions** → **Manual Deploy to Test Environment**
+3. Configure: Action=`deploy`, Deploy to Azure=✅, select your branch
+4. Get your app URL (e.g., `https://mealfortoday-test-mybranch.azurecontainerapps.io`)
+5. **Cleanup**: Run workflow with Action=`cleanup` when done
+
+**Features:**
+- ✅ Auto-scales to 0 when idle (free tier friendly)
+- ✅ One-click deployment and cleanup
+- ✅ HTTPS endpoint automatically configured
+
+### Manual Docker Deployment
 
 1. Go to **Actions** → **Manual Deploy to Test Environment**
-2. Select your PR branch and click **Run workflow**
-3. The workflow builds a Docker image and pushes it to GitHub Container Registry
-4. Deploy locally or to cloud:
+2. Configure: Action=`deploy`, Deploy to Azure=unchecked, select your branch
+3. After workflow completes, deploy locally:
 
 ```bash
 # Pull and run locally
