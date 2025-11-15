@@ -146,7 +146,7 @@ The workflow will:
 
 The workflow will:
 - Delete the Container App for the specified branch
-- Remove the resource group if no other resources remain
+- Keep the resource group and environment for future deployments
 
 ## Auto-Scaling Configuration
 

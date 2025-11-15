@@ -319,27 +319,6 @@ jobs:
             echo "Container app not found: ${{ steps.vars.outputs.container_app_name }}"
           fi
       
-      - name: Check for remaining resources
-        id: check
-        run: |
-          REMAINING=$(az containerapp list \
-            --resource-group ${{ steps.vars.outputs.resource_group }} \
-            --query "length([])" \
-            --output tsv 2>/dev/null || echo "0")
-          
-          echo "remaining=$REMAINING" >> $GITHUB_OUTPUT
-          echo "Remaining container apps in resource group: $REMAINING"
-      
-      - name: Cleanup empty resource group
-        if: steps.check.outputs.remaining == '0'
-        run: |
-          echo "No container apps remaining. Cleaning up resource group..."
-          az group delete \
-            --name ${{ steps.vars.outputs.resource_group }} \
-            --yes \
-            --no-wait
-          echo "Resource group cleanup initiated"
-      
       - name: Generate cleanup summary
         run: |
           echo "## 🧹 Cleanup Complete" >> $GITHUB_STEP_SUMMARY
@@ -349,11 +328,7 @@ jobs:
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Deleted:** \`${{ steps.vars.outputs.container_app_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.check.outputs.remaining }}" == "0" ]; then
-            echo "**Resource Group:** Also deleted (no remaining resources)" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "**Resource Group:** Retained (${{ steps.check.outputs.remaining }} resources remaining)" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "**Resource Group:** \`${{ steps.vars.outputs.resource_group }}\` (retained)" >> $GITHUB_STEP_SUMMARY
       
       - name: Comment on PR with cleanup status
         if: github.event_name == 'pull_request' || inputs.pr_number != ''

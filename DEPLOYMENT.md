@@ -189,8 +189,7 @@ When done testing, remove the deployment:
 
 The workflow will:
 - Delete the container app
-- Delete the resource group if no other resources remain
-- Free up your Azure resources
+- Keep the resource group and environment for future deployments
 
 #### Resource Naming
 
