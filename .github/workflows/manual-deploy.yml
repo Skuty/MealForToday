@@ -1,0 +1,392 @@
+name: Manual Deploy to Test Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - cleanup
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - test
+          - staging
+      deploy_to_azure:
+        description: 'Deploy to Azure Container Apps'
+        required: false
+        default: false
+        type: boolean
+      pr_number:
+        description: 'PR number (optional - will auto-detect from branch)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  build-and-push:
+    if: inputs.action == 'deploy'
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      image_digest: ${{ steps.build.outputs.digest }}
+      branch_name: ${{ steps.branch.outputs.name }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Extract branch name
+        id: branch
+        run: |
+          BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
+          echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "Branch name: $BRANCH_NAME"
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=${{ inputs.environment }}-{{branch}}-{{sha}}
+      
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Generate deployment summary
+        run: |
+          echo "## 🚀 Deployment Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`ghcr.io/${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Built Image Tags:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 How to Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Option 1: Docker Compose (Local/Self-Hosted)" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Pull the image" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Run the container" >> $GITHUB_STEP_SUMMARY
+          echo "docker run -d -p 8080:8080 \\" >> $GITHUB_STEP_SUMMARY
+          echo "  --name mealfortoday-test \\" >> $GITHUB_STEP_SUMMARY
+          echo "  ghcr.io/${{ github.repository }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Option 2: Azure Container Apps" >> $GITHUB_STEP_SUMMARY
+          echo "See [DEPLOYMENT.md](DEPLOYMENT.md) for Azure deployment instructions." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Option 3: Azure Web App" >> $GITHUB_STEP_SUMMARY
+          echo "See [DEPLOYMENT.md](DEPLOYMENT.md) for Azure Web App deployment instructions." >> $GITHUB_STEP_SUMMARY
+      
+      - name: Comment on PR with deployment info
+        if: github.event_name == 'pull_request' || inputs.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request?.number || '${{ inputs.pr_number }}';
+            if (prNumber) {
+              github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `## 🚀 Test Deployment Available\n\n` +
+                      `A Docker image has been built and pushed for testing.\n\n` +
+                      `**Image:** \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\`\n\n` +
+                      `**Environment:** ${{ inputs.environment }}\n\n` +
+                      `### Quick Deploy Commands:\n` +
+                      `\`\`\`bash\n` +
+                      `docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}\n` +
+                      `docker run -d -p 8080:8080 ghcr.io/${{ github.repository }}:${{ github.ref_name }}\n` +
+                      `\`\`\`\n\n` +
+                      `Access the app at: http://localhost:8080\n\n` +
+                      `See [DEPLOYMENT.md](../blob/main/DEPLOYMENT.md) for cloud deployment options.`
+              });
+            }
+  
+  deploy-to-azure:
+    if: inputs.action == 'deploy' && inputs.deploy_to_azure == true
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Set deployment variables
+        id: vars
+        run: |
+          BRANCH_NAME="${{ needs.build-and-push.outputs.branch_name }}"
+          RESOURCE_GROUP="mealfortoday-${{ inputs.environment }}-rg"
+          CONTAINER_APP_ENV="mealfortoday-${{ inputs.environment }}-env"
+          CONTAINER_APP_NAME="mealfortoday-${{ inputs.environment }}-${BRANCH_NAME}"
+          LOCATION="eastus"
+          
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
+          echo "container_app_env=$CONTAINER_APP_ENV" >> $GITHUB_OUTPUT
+          echo "container_app_name=$CONTAINER_APP_NAME" >> $GITHUB_OUTPUT
+          echo "location=$LOCATION" >> $GITHUB_OUTPUT
+      
+      - name: Create Resource Group
+        run: |
+          az group create \
+            --name ${{ steps.vars.outputs.resource_group }} \
+            --location ${{ steps.vars.outputs.location }} \
+            || echo "Resource group already exists"
+      
+      - name: Create Container Apps Environment
+        run: |
+          az containerapp env create \
+            --name ${{ steps.vars.outputs.container_app_env }} \
+            --resource-group ${{ steps.vars.outputs.resource_group }} \
+            --location ${{ steps.vars.outputs.location }} \
+            || echo "Container Apps environment already exists"
+      
+      - name: Deploy to Azure Container Apps
+        run: |
+          # Check if container app exists
+          if az containerapp show \
+            --name ${{ steps.vars.outputs.container_app_name }} \
+            --resource-group ${{ steps.vars.outputs.resource_group }} &> /dev/null; then
+            
+            echo "Updating existing container app..."
+            az containerapp update \
+              --name ${{ steps.vars.outputs.container_app_name }} \
+              --resource-group ${{ steps.vars.outputs.resource_group }} \
+              --image ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+          else
+            echo "Creating new container app..."
+            az containerapp create \
+              --name ${{ steps.vars.outputs.container_app_name }} \
+              --resource-group ${{ steps.vars.outputs.resource_group }} \
+              --environment ${{ steps.vars.outputs.container_app_env }} \
+              --image ghcr.io/${{ github.repository }}:${{ github.ref_name }} \
+              --target-port 8080 \
+              --ingress external \
+              --min-replicas 0 \
+              --max-replicas 1 \
+              --cpu 0.25 \
+              --memory 0.5Gi \
+              --env-vars ASPNETCORE_ENVIRONMENT=Production
+          fi
+      
+      - name: Get Application URL
+        id: url
+        run: |
+          URL=$(az containerapp show \
+            --name ${{ steps.vars.outputs.container_app_name }} \
+            --resource-group ${{ steps.vars.outputs.resource_group }} \
+            --query properties.configuration.ingress.fqdn \
+            --output tsv)
+          echo "url=https://$URL" >> $GITHUB_OUTPUT
+          echo "Application URL: https://$URL"
+      
+      - name: Generate Azure deployment summary
+        run: |
+          echo "## ☁️ Azure Container Apps Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** \`${{ steps.vars.outputs.resource_group }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Container App:** \`${{ steps.vars.outputs.container_app_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌐 Application URL" >> $GITHUB_STEP_SUMMARY
+          echo "[${{ steps.url.outputs.url }}](${{ steps.url.outputs.url }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⚙️ Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Auto-scaling:** 0-1 replicas (scales to zero when idle)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Resources:** 0.25 vCPU, 0.5Gi memory" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🧹 Cleanup" >> $GITHUB_STEP_SUMMARY
+          echo "To remove this deployment, run the workflow with:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Action:** cleanup" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Comment on PR with Azure deployment
+        if: github.event_name == 'pull_request' || inputs.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request?.number || '${{ inputs.pr_number }}';
+            if (prNumber) {
+              github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `## ☁️ Azure Container Apps Deployment\n\n` +
+                      `✅ Successfully deployed to Azure Container Apps!\n\n` +
+                      `**Application URL:** ${{ steps.url.outputs.url }}\n\n` +
+                      `**Configuration:**\n` +
+                      `- Auto-scaling: 0-1 replicas (scales to zero when idle)\n` +
+                      `- Resources: 0.25 vCPU, 0.5Gi memory\n` +
+                      `- Environment: ${{ inputs.environment }}\n\n` +
+                      `**Demo Credentials:**\n` +
+                      `- Email: \`demo@mealfortoday.local\`\n` +
+                      `- Username: \`demo\`\n` +
+                      `- Password: \`Password123!\`\n\n` +
+                      `**Note:** The app uses in-memory database. Data will reset when the container restarts or scales to zero.\n\n` +
+                      `To cleanup, run the workflow with action "cleanup".`
+              });
+            }
+  
+  cleanup:
+    if: inputs.action == 'cleanup'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Set cleanup variables
+        id: vars
+        run: |
+          RESOURCE_GROUP="mealfortoday-${{ inputs.environment }}-rg"
+          
+          echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
+      
+      - name: List and Delete All Container Apps
+        id: cleanup
+        run: |
+          RESOURCE_GROUP="${{ steps.vars.outputs.resource_group }}"
+          
+          # Check if resource group exists
+          if ! az group show --name $RESOURCE_GROUP &> /dev/null; then
+            echo "Resource group not found: $RESOURCE_GROUP"
+            echo "deleted_count=0" >> $GITHUB_OUTPUT
+            echo "deleted_apps=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # List all container apps in the resource group
+          CONTAINER_APPS=$(az containerapp list \
+            --resource-group $RESOURCE_GROUP \
+            --query "[].name" \
+            --output tsv)
+          
+          if [ -z "$CONTAINER_APPS" ]; then
+            echo "No container apps found in resource group: $RESOURCE_GROUP"
+            echo "deleted_count=0" >> $GITHUB_OUTPUT
+            echo "deleted_apps=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Delete each container app
+          DELETED_APPS=""
+          COUNT=0
+          while IFS= read -r APP_NAME; do
+            if [ -n "$APP_NAME" ]; then
+              echo "Deleting container app: $APP_NAME"
+              az containerapp delete \
+                --name "$APP_NAME" \
+                --resource-group $RESOURCE_GROUP \
+                --yes
+              
+              if [ $COUNT -eq 0 ]; then
+                DELETED_APPS="$APP_NAME"
+              else
+                DELETED_APPS="$DELETED_APPS, $APP_NAME"
+              fi
+              COUNT=$((COUNT + 1))
+            fi
+          done <<< "$CONTAINER_APPS"
+          
+          echo "Successfully deleted $COUNT container app(s)"
+          echo "deleted_count=$COUNT" >> $GITHUB_OUTPUT
+          echo "deleted_apps=$DELETED_APPS" >> $GITHUB_OUTPUT
+      
+      - name: Generate cleanup summary
+        run: |
+          echo "## 🧹 Cleanup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Cleanup successful" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** \`${{ steps.vars.outputs.resource_group }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deleted Container Apps:** ${{ steps.cleanup.outputs.deleted_count }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.cleanup.outputs.deleted_count }}" != "0" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Apps Removed:**" >> $GITHUB_STEP_SUMMARY
+            echo "\`${{ steps.cleanup.outputs.deleted_apps }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: Comment on PR with cleanup status
+        if: github.event_name == 'pull_request' || inputs.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request?.number || '${{ inputs.pr_number }}';
+            if (prNumber) {
+              const deletedCount = '${{ steps.cleanup.outputs.deleted_count }}';
+              const deletedApps = '${{ steps.cleanup.outputs.deleted_apps }}';
+              
+              let message = `## 🧹 Cleanup Complete\n\n` +
+                           `✅ Successfully cleaned up Azure Container Apps.\n\n` +
+                           `**Environment:** ${{ inputs.environment }}\n` +
+                           `**Deleted Container Apps:** ${deletedCount}\n`;
+              
+              if (deletedCount !== '0') {
+                message += `\n**Apps Removed:** \`${deletedApps}\`\n`;
+              }
+              
+              github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: message
+              });
+            }

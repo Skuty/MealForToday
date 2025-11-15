@@ -1,0 +1,29 @@
+# Ignore build outputs
+**/bin/
+**/obj/
+**/out/
+
+# Ignore Git files
+.git
+.gitignore
+.github
+
+# Ignore IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Ignore test projects (not needed in container)
+tests/
+
+# Ignore documentation
+*.md
+!README.md
+
+# Ignore dev container
+.devcontainer/
+
+# Ignore temporary files
+**/.DS_Store
+**/Thumbs.db
