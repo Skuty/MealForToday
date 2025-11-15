@@ -295,29 +295,59 @@ jobs:
       - name: Set cleanup variables
         id: vars
         run: |
-          BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
           RESOURCE_GROUP="mealfortoday-${{ inputs.environment }}-rg"
-          CONTAINER_APP_NAME="mealfortoday-${{ inputs.environment }}-${BRANCH_NAME}"
           
-          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
           echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
-          echo "container_app_name=$CONTAINER_APP_NAME" >> $GITHUB_OUTPUT
       
-      - name: Delete Container App
+      - name: List and Delete All Container Apps
+        id: cleanup
         run: |
-          if az containerapp show \
-            --name ${{ steps.vars.outputs.container_app_name }} \
-            --resource-group ${{ steps.vars.outputs.resource_group }} &> /dev/null; then
-            
-            echo "Deleting container app: ${{ steps.vars.outputs.container_app_name }}"
-            az containerapp delete \
-              --name ${{ steps.vars.outputs.container_app_name }} \
-              --resource-group ${{ steps.vars.outputs.resource_group }} \
-              --yes
-            echo "Container app deleted successfully"
-          else
-            echo "Container app not found: ${{ steps.vars.outputs.container_app_name }}"
+          RESOURCE_GROUP="${{ steps.vars.outputs.resource_group }}"
+          
+          # Check if resource group exists
+          if ! az group show --name $RESOURCE_GROUP &> /dev/null; then
+            echo "Resource group not found: $RESOURCE_GROUP"
+            echo "deleted_count=0" >> $GITHUB_OUTPUT
+            echo "deleted_apps=" >> $GITHUB_OUTPUT
+            exit 0
           fi
+          
+          # List all container apps in the resource group
+          CONTAINER_APPS=$(az containerapp list \
+            --resource-group $RESOURCE_GROUP \
+            --query "[].name" \
+            --output tsv)
+          
+          if [ -z "$CONTAINER_APPS" ]; then
+            echo "No container apps found in resource group: $RESOURCE_GROUP"
+            echo "deleted_count=0" >> $GITHUB_OUTPUT
+            echo "deleted_apps=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Delete each container app
+          DELETED_APPS=""
+          COUNT=0
+          while IFS= read -r APP_NAME; do
+            if [ -n "$APP_NAME" ]; then
+              echo "Deleting container app: $APP_NAME"
+              az containerapp delete \
+                --name "$APP_NAME" \
+                --resource-group $RESOURCE_GROUP \
+                --yes
+              
+              if [ $COUNT -eq 0 ]; then
+                DELETED_APPS="$APP_NAME"
+              else
+                DELETED_APPS="$DELETED_APPS, $APP_NAME"
+              fi
+              COUNT=$((COUNT + 1))
+            fi
+          done <<< "$CONTAINER_APPS"
+          
+          echo "Successfully deleted $COUNT container app(s)"
+          echo "deleted_count=$COUNT" >> $GITHUB_OUTPUT
+          echo "deleted_apps=$DELETED_APPS" >> $GITHUB_OUTPUT
       
       - name: Generate cleanup summary
         run: |
@@ -325,10 +355,14 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Status:** ✅ Cleanup successful" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Deleted:** \`${{ steps.vars.outputs.container_app_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** \`${{ steps.vars.outputs.resource_group }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Resource Group:** \`${{ steps.vars.outputs.resource_group }}\` (retained)" >> $GITHUB_STEP_SUMMARY
+          echo "**Deleted Container Apps:** ${{ steps.cleanup.outputs.deleted_count }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.cleanup.outputs.deleted_count }}" != "0" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Apps Removed:**" >> $GITHUB_STEP_SUMMARY
+            echo "\`${{ steps.cleanup.outputs.deleted_apps }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
       
       - name: Comment on PR with cleanup status
         if: github.event_name == 'pull_request' || inputs.pr_number != ''
@@ -337,13 +371,22 @@ jobs:
           script: |
             const prNumber = context.payload.pull_request?.number || '${{ inputs.pr_number }}';
             if (prNumber) {
+              const deletedCount = '${{ steps.cleanup.outputs.deleted_count }}';
+              const deletedApps = '${{ steps.cleanup.outputs.deleted_apps }}';
+              
+              let message = `## 🧹 Cleanup Complete\n\n` +
+                           `✅ Successfully cleaned up Azure Container Apps.\n\n` +
+                           `**Environment:** ${{ inputs.environment }}\n` +
+                           `**Deleted Container Apps:** ${deletedCount}\n`;
+              
+              if (deletedCount !== '0') {
+                message += `\n**Apps Removed:** \`${deletedApps}\`\n`;
+              }
+              
               github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                body: `## 🧹 Cleanup Complete\n\n` +
-                      `✅ Successfully cleaned up Azure Container Apps deployment.\n\n` +
-                      `**Deleted:** \`${{ steps.vars.outputs.container_app_name }}\`\n` +
-                      `**Environment:** ${{ inputs.environment }}\n`
+                body: message
               });
             }

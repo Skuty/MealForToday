@@ -141,11 +141,10 @@ The workflow will:
 3. Configure:
    - **Action**: `cleanup`
    - **Environment**: `test` or `staging`
-   - **Branch**: Same branch you deployed
 4. Click **Run workflow**
 
 The workflow will:
-- Delete the Container App for the specified branch
+- Delete ALL Container Apps in the specified environment
 - Keep the resource group and environment for future deployments
 
 ## Auto-Scaling Configuration

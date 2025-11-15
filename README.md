@@ -45,7 +45,7 @@ Deploy to Azure Container Apps with auto-scaling to zero:
 2. Go to **Actions** → **Manual Deploy to Test Environment**
 3. Configure: Action=`deploy`, Deploy to Azure=✅, select your branch
 4. Get your app URL (e.g., `https://mealfortoday-test-mybranch.azurecontainerapps.io`)
-5. **Cleanup**: Run workflow with Action=`cleanup` when done
+5. **Cleanup**: Run workflow with Action=`cleanup` to remove all container apps in the environment
 
 **Features:**
 - ✅ Auto-scales to 0 when idle (free tier friendly)

@@ -177,18 +177,17 @@ The workflow will:
 
 #### Cleanup Azure Deployment
 
-When done testing, remove the deployment:
+When done testing, remove all deployments:
 
 1. Go to **Actions** → **"Manual Deploy to Test Environment"**
 2. Click **"Run workflow"**
 3. Configure:
    - **Action**: `cleanup`
    - **Environment**: Same as deployment (e.g., `test`)
-   - **Branch**: Same branch you deployed
 4. Click **"Run workflow"**
 
 The workflow will:
-- Delete the container app
+- Delete ALL container apps in the specified environment
 - Keep the resource group and environment for future deployments
 
 #### Resource Naming

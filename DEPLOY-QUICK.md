@@ -28,7 +28,7 @@ This is a quick reference for deploying your PR branch for testing.
 
 4. **Cleanup When Done**:
    - Run workflow again with Action: `cleanup`
-   - Removes all Azure resources for your branch
+   - Removes ALL container apps in the specified environment
 
 ## Alternative: Deploy Locally with Docker
 
