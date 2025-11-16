@@ -166,7 +166,7 @@ jobs:
           RESOURCE_GROUP="MealForToday"
           CONTAINER_APP_ENV="mealfortoday-${{ inputs.environment }}-env"
           CONTAINER_APP_NAME="mealfortoday-${{ inputs.environment }}-${BRANCH_NAME}"
-          LOCATION="eastus"
+          LOCATION="northeurope"
           
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
           echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
