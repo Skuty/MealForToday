@@ -44,6 +44,7 @@ jobs:
       image_digest: ${{ steps.build.outputs.digest }}
       branch_name: ${{ steps.branch.outputs.name }}
       image_name: ${{ steps.image.outputs.name }}
+      image_ref: ${{ steps.image_ref.outputs.ref }}
     
     steps:
       - name: Checkout code
@@ -128,6 +129,15 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      
+      - name: Set image reference for deployment
+        id: image_ref
+        run: |
+          # Convert branch name to lowercase for Docker tag
+          BRANCH_TAG=$(echo "${{ github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g')
+          IMAGE_REF="${{ steps.image.outputs.name }}:${BRANCH_TAG}"
+          echo "ref=${IMAGE_REF}" >> $GITHUB_OUTPUT
+          echo "Image reference for deployment: ${IMAGE_REF}"
       
       - name: Generate deployment summary
         run: |
@@ -227,14 +237,14 @@ jobs:
             az containerapp update \
               --name ${{ steps.vars.outputs.container_app_name }} \
               --resource-group ${{ steps.vars.outputs.resource_group }} \
-              --image ${{ steps.image.outputs.name }}:${{ github.ref_name }}
+              --image ${{ needs.build-and-push.outputs.image_ref }}
           else
             echo "Creating new container app..."
             az containerapp create \
               --name ${{ steps.vars.outputs.container_app_name }} \
               --resource-group ${{ steps.vars.outputs.resource_group }} \
               --environment ${{ steps.vars.outputs.container_app_env }} \
-              --image ${{ steps.image.outputs.name }}:${{ github.ref_name }} \
+              --image ${{ needs.build-and-push.outputs.image_ref }} \
               --target-port 8080 \
               --ingress external \
               --min-replicas 0 \
@@ -271,7 +281,7 @@ jobs:
           echo "### ⚙️ Configuration" >> $GITHUB_STEP_SUMMARY
           echo "- **Auto-scaling:** 0-1 replicas (scales to zero when idle)" >> $GITHUB_STEP_SUMMARY
           echo "- **Resources:** 0.25 vCPU, 0.5Gi memory" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image:** \`${{ steps.image.outputs.name }}:${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** \`${{ needs.build-and-push.outputs.image_ref }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🧹 Cleanup" >> $GITHUB_STEP_SUMMARY
           echo "To remove this deployment, run the workflow with:" >> $GITHUB_STEP_SUMMARY
