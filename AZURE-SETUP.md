@@ -36,7 +36,9 @@ The workflow uses **Azure Federated Identity** (workload identity federation) fo
 
 ### Step 2: Configure Federated Credentials
 
-Set up federated identity credentials to allow GitHub Actions to authenticate:
+Set up federated identity credentials to allow GitHub Actions to authenticate. 
+
+**Important**: The manual deployment workflow uses GitHub environments (`test`, `staging`), so you **must** create the environment-specific federated credentials (shown below) in addition to the branch-based ones.
 
 ```bash
 APP_ID="<your-app-id>"
@@ -70,6 +72,26 @@ az ad app federated-credential create \
     "name": "MealForToday-GitHub-Actions-Branch",
     "issuer": "https://token.actions.githubusercontent.com",
     "subject": "repo:'$GITHUB_ORG'/'$GITHUB_REPO':ref:refs/heads/*",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
+# For test environment (required for manual deployments using environment: test)
+az ad app federated-credential create \
+  --id $APP_ID \
+  --parameters '{
+    "name": "MealForToday-GitHub-Actions-Test-Env",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:'$GITHUB_ORG'/'$GITHUB_REPO':environment:test",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
+# For staging environment (required for manual deployments using environment: staging)
+az ad app federated-credential create \
+  --id $APP_ID \
+  --parameters '{
+    "name": "MealForToday-GitHub-Actions-Staging-Env",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:'$GITHUB_ORG'/'$GITHUB_REPO':environment:staging",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 ```
@@ -203,12 +225,13 @@ With auto-scaling to 0, costs depend on actual usage:
 
 ### Authentication Issues
 
-**Problem**: "AADSTS70021: No matching federated identity record found"
+**Problem**: "AADSTS70021: No matching federated identity record found" or "AADSTS700213: No matching federated identity record found for presented assertion subject 'repo:Skuty/MealForToday:environment:test'"
 
 **Solution**: 
 - Verify federated credentials are created for the correct repository
 - Check the subject pattern matches your workflow trigger
 - Ensure GitHub organization and repo names are correct
+- **For environment-based deployments**: Make sure you've created federated credentials for each environment (test, staging) as shown in Step 2. The workflow uses `environment: test` which requires a matching federated credential with subject `repo:ORG/REPO:environment:test`
 
 ### Deployment Failures
 
