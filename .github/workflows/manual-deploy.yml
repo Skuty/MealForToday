@@ -79,7 +79,7 @@ jobs:
           
           # Truncate to 20 characters to leave room for "mealfortoday-test-" prefix (11 chars)
           # Total will be max 31 characters
-          BRANCH_NAME=$(echo "$BRANCH_NAME" | cut -c1-17)
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | cut -c1-10)
           
           # Remove trailing hyphen again if truncation created one
           BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/-*$//')
