@@ -192,14 +192,14 @@ The deployment is configured with auto-scaling to 0:
 
 ## Resource Naming Convention
 
-Resources are named based on environment and branch:
+All resources are created in a single resource group, with environment and branch differentiation in the app names:
 
-- **Resource Group**: `mealfortoday-{environment}-rg`
+- **Resource Group**: `MealForToday` (shared across all environments)
 - **Container App Environment**: `mealfortoday-{environment}-env`
 - **Container App**: `mealfortoday-{environment}-{branch-name}`
 
 Example for branch `feature/new-ui` in `test` environment:
-- Resource Group: `mealfortoday-test-rg`
+- Resource Group: `MealForToday`
 - Container App Environment: `mealfortoday-test-env`
 - Container App: `mealfortoday-test-feature-new-ui`
 
@@ -264,7 +264,8 @@ az role assignment create \
 
 **Solution**:
 - Check Azure Portal for resources
-- Manually delete using: `az group delete --name mealfortoday-test-rg --yes`
+- Note: The cleanup workflow deletes individual container apps, not the resource group
+- To delete everything including the resource group: `az group delete --name MealForToday --yes`
 - Verify branch name matches (hyphens instead of special characters)
 
 ## Security Best Practices

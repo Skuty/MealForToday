@@ -193,7 +193,7 @@ The workflow will:
 #### Resource Naming
 
 Resources are automatically named:
-- **Resource Group**: `mealfortoday-{environment}-rg`
+- **Resource Group**: `MealForToday` (shared across all environments)
 - **Container App Environment**: `mealfortoday-{environment}-env`
 - **Container App**: `mealfortoday-{environment}-{branch-name}`
 
@@ -241,7 +241,7 @@ Azure Container Apps provides a free tier suitable for testing and development.
 
 1. **Set variables**:
    ```bash
-   RESOURCE_GROUP="mealfortoday-test-rg"
+   RESOURCE_GROUP="MealForToday"
    LOCATION="eastus"
    CONTAINER_APP_ENV="mealfortoday-env"
    CONTAINER_APP_NAME="mealfortoday-test"
@@ -322,7 +322,7 @@ Azure Web Apps also offers a free tier (F1) for testing.
 
 1. **Set variables**:
    ```bash
-   RESOURCE_GROUP="mealfortoday-test-rg"
+   RESOURCE_GROUP="MealForToday"
    LOCATION="eastus"
    APP_SERVICE_PLAN="mealfortoday-plan"
    WEB_APP_NAME="mealfortoday-test-$(date +%s)"  # Unique name

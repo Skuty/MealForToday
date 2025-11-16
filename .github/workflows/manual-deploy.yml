@@ -163,7 +163,7 @@ jobs:
         id: vars
         run: |
           BRANCH_NAME="${{ needs.build-and-push.outputs.branch_name }}"
-          RESOURCE_GROUP="mealfortoday-${{ inputs.environment }}-rg"
+          RESOURCE_GROUP="MealForToday"
           CONTAINER_APP_ENV="mealfortoday-${{ inputs.environment }}-env"
           CONTAINER_APP_NAME="mealfortoday-${{ inputs.environment }}-${BRANCH_NAME}"
           LOCATION="eastus"
@@ -295,7 +295,7 @@ jobs:
       - name: Set cleanup variables
         id: vars
         run: |
-          RESOURCE_GROUP="mealfortoday-${{ inputs.environment }}-rg"
+          RESOURCE_GROUP="MealForToday"
           
           echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
       
