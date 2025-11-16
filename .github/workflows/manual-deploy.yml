@@ -173,22 +173,7 @@ jobs:
           echo "container_app_env=$CONTAINER_APP_ENV" >> $GITHUB_OUTPUT
           echo "container_app_name=$CONTAINER_APP_NAME" >> $GITHUB_OUTPUT
           echo "location=$LOCATION" >> $GITHUB_OUTPUT
-      
-      - name: Create Resource Group
-        run: |
-          az group create \
-            --name ${{ steps.vars.outputs.resource_group }} \
-            --location ${{ steps.vars.outputs.location }} \
-            || echo "Resource group already exists"
-      
-      - name: Create Container Apps Environment
-        run: |
-          az containerapp env create \
-            --name ${{ steps.vars.outputs.container_app_env }} \
-            --resource-group ${{ steps.vars.outputs.resource_group }} \
-            --location ${{ steps.vars.outputs.location }} \
-            || echo "Container Apps environment already exists"
-      
+            
       - name: Deploy to Azure Container Apps
         run: |
           # Check if container app exists
@@ -214,7 +199,7 @@ jobs:
               --max-replicas 1 \
               --cpu 0.25 \
               --memory 0.5Gi \
-              --env-vars ASPNETCORE_ENVIRONMENT=Production
+              --env-vars ASPNETCORE_ENVIRONMENT=Development
           fi
       
       - name: Get Application URL
