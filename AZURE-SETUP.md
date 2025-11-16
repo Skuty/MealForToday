@@ -36,7 +36,9 @@ The workflow uses **Azure Federated Identity** (workload identity federation) fo
 
 ### Step 2: Configure Federated Credentials
 
-Set up federated identity credentials to allow GitHub Actions to authenticate:
+Set up federated identity credentials to allow GitHub Actions to authenticate. 
+
+**Important**: The manual deployment workflow uses GitHub environments (`test`, `staging`), so you **must** create the environment-specific federated credentials (shown below) in addition to the branch-based ones.
 
 ```bash
 APP_ID="<your-app-id>"
@@ -70,6 +72,26 @@ az ad app federated-credential create \
     "name": "MealForToday-GitHub-Actions-Branch",
     "issuer": "https://token.actions.githubusercontent.com",
     "subject": "repo:'$GITHUB_ORG'/'$GITHUB_REPO':ref:refs/heads/*",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
+# For test environment (required for manual deployments using environment: test)
+az ad app federated-credential create \
+  --id $APP_ID \
+  --parameters '{
+    "name": "MealForToday-GitHub-Actions-Test-Env",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:'$GITHUB_ORG'/'$GITHUB_REPO':environment:test",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
+# For staging environment (required for manual deployments using environment: staging)
+az ad app federated-credential create \
+  --id $APP_ID \
+  --parameters '{
+    "name": "MealForToday-GitHub-Actions-Staging-Env",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:'$GITHUB_ORG'/'$GITHUB_REPO':environment:staging",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 ```
@@ -170,14 +192,14 @@ The deployment is configured with auto-scaling to 0:
 
 ## Resource Naming Convention
 
-Resources are named based on environment and branch:
+All resources are created in a single resource group, with environment and branch differentiation in the app names:
 
-- **Resource Group**: `mealfortoday-{environment}-rg`
+- **Resource Group**: `MealForToday` (shared across all environments)
 - **Container App Environment**: `mealfortoday-{environment}-env`
 - **Container App**: `mealfortoday-{environment}-{branch-name}`
 
 Example for branch `feature/new-ui` in `test` environment:
-- Resource Group: `mealfortoday-test-rg`
+- Resource Group: `MealForToday`
 - Container App Environment: `mealfortoday-test-env`
 - Container App: `mealfortoday-test-feature-new-ui`
 
@@ -203,12 +225,13 @@ With auto-scaling to 0, costs depend on actual usage:
 
 ### Authentication Issues
 
-**Problem**: "AADSTS70021: No matching federated identity record found"
+**Problem**: "AADSTS70021: No matching federated identity record found" or "AADSTS700213: No matching federated identity record found for presented assertion subject 'repo:Skuty/MealForToday:environment:test'"
 
 **Solution**: 
 - Verify federated credentials are created for the correct repository
 - Check the subject pattern matches your workflow trigger
 - Ensure GitHub organization and repo names are correct
+- **For environment-based deployments**: Make sure you've created federated credentials for each environment (test, staging) as shown in Step 2. The workflow uses `environment: test` which requires a matching federated credential with subject `repo:ORG/REPO:environment:test`
 
 ### Deployment Failures
 
@@ -241,7 +264,8 @@ az role assignment create \
 
 **Solution**:
 - Check Azure Portal for resources
-- Manually delete using: `az group delete --name mealfortoday-test-rg --yes`
+- Note: The cleanup workflow deletes individual container apps, not the resource group
+- To delete everything including the resource group: `az group delete --name MealForToday --yes`
 - Verify branch name matches (hyphens instead of special characters)
 
 ## Security Best Practices
