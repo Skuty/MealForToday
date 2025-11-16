@@ -43,17 +43,60 @@ jobs:
       image_tag: ${{ steps.meta.outputs.tags }}
       image_digest: ${{ steps.build.outputs.digest }}
       branch_name: ${{ steps.branch.outputs.name }}
+      image_name: ${{ steps.image.outputs.name }}
+      image_ref: ${{ steps.image_ref.outputs.ref }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Convert repository name to lowercase
+        id: image
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "name=ghcr.io/${REPO_LOWER}" >> $GITHUB_OUTPUT
+          echo "Repository: ${{ github.repository }}"
+          echo "Lowercase image name: ghcr.io/${REPO_LOWER}"
+      
       - name: Extract branch name
         id: branch
         run: |
-          BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
+          # Sanitize branch name for Azure Container App naming requirements:
+          # - Must consist of lowercase alphanumeric characters or '-'
+          # - Must start with a letter
+          # - Must end with an alphanumeric character
+          # - Cannot contain '--'
+          # - Must be less than 32 characters total (including environment prefix)
+          
+          RAW_BRANCH="${{ github.ref_name }}"
+          
+          # Convert to lowercase and replace non-alphanumeric with hyphens
+          BRANCH_NAME=$(echo "$RAW_BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
+          
+          # Remove consecutive hyphens
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/--*/-/g')
+          
+          # Remove leading hyphens and non-letters
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/^[^a-z]*//')
+          
+          # Remove trailing hyphens
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/-*$//')
+          
+          # Ensure it starts with a letter (add 'br' prefix if it doesn't)
+          if ! echo "$BRANCH_NAME" | grep -q '^[a-z]'; then
+            BRANCH_NAME="br-${BRANCH_NAME}"
+          fi
+          
+          # Truncate to 20 characters to leave room for "mealfortoday-test-" prefix (11 chars)
+          # Total will be max 31 characters
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | cut -c1-10)
+          
+          # Remove trailing hyphen again if truncation created one
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/-*$//')
+          
           echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          echo "Branch name: $BRANCH_NAME"
+          echo "Original branch: $RAW_BRANCH"
+          echo "Sanitized branch name: $BRANCH_NAME"
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -69,7 +112,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ steps.image.outputs.name }}
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -87,6 +130,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
+      - name: Set image reference for deployment
+        id: image_ref
+        run: |
+          # Convert branch name to lowercase for Docker tag
+          BRANCH_TAG=$(echo "${{ github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g')
+          IMAGE_REF="${{ steps.image.outputs.name }}:${BRANCH_TAG}"
+          echo "ref=${IMAGE_REF}" >> $GITHUB_OUTPUT
+          echo "Image reference for deployment: ${IMAGE_REF}"
+      
       - name: Generate deployment summary
         run: |
           echo "## 🚀 Deployment Build Summary" >> $GITHUB_STEP_SUMMARY
@@ -94,7 +146,7 @@ jobs:
           echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`ghcr.io/${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ steps.image.outputs.name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 Built Image Tags:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
@@ -106,12 +158,12 @@ jobs:
           echo "#### Option 1: Docker Compose (Local/Self-Hosted)" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "# Pull the image" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ steps.image.outputs.name }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "# Run the container" >> $GITHUB_STEP_SUMMARY
           echo "docker run -d -p 8080:8080 \\" >> $GITHUB_STEP_SUMMARY
           echo "  --name mealfortoday-test \\" >> $GITHUB_STEP_SUMMARY
-          echo "  ghcr.io/${{ github.repository }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "  ${{ steps.image.outputs.name }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### Option 2: Azure Container Apps" >> $GITHUB_STEP_SUMMARY
@@ -133,12 +185,12 @@ jobs:
                 issue_number: prNumber,
                 body: `## 🚀 Test Deployment Available\n\n` +
                       `A Docker image has been built and pushed for testing.\n\n` +
-                      `**Image:** \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\`\n\n` +
+                      `**Image:** \`${{ steps.image.outputs.name }}:${{ github.ref_name }}\`\n\n` +
                       `**Environment:** ${{ inputs.environment }}\n\n` +
                       `### Quick Deploy Commands:\n` +
                       `\`\`\`bash\n` +
-                      `docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}\n` +
-                      `docker run -d -p 8080:8080 ghcr.io/${{ github.repository }}:${{ github.ref_name }}\n` +
+                      `docker pull ${{ steps.image.outputs.name }}:${{ github.ref_name }}\n` +
+                      `docker run -d -p 8080:8080 ${{ steps.image.outputs.name }}:${{ github.ref_name }}\n` +
                       `\`\`\`\n\n` +
                       `Access the app at: http://localhost:8080\n\n` +
                       `See [DEPLOYMENT.md](../blob/main/DEPLOYMENT.md) for cloud deployment options.`
@@ -166,29 +218,14 @@ jobs:
           RESOURCE_GROUP="MealForToday"
           CONTAINER_APP_ENV="mealfortoday-${{ inputs.environment }}-env"
           CONTAINER_APP_NAME="mealfortoday-${{ inputs.environment }}-${BRANCH_NAME}"
-          LOCATION="eastus"
+          LOCATION="northeurope"
           
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
           echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
           echo "container_app_env=$CONTAINER_APP_ENV" >> $GITHUB_OUTPUT
           echo "container_app_name=$CONTAINER_APP_NAME" >> $GITHUB_OUTPUT
           echo "location=$LOCATION" >> $GITHUB_OUTPUT
-      
-      - name: Create Resource Group
-        run: |
-          az group create \
-            --name ${{ steps.vars.outputs.resource_group }} \
-            --location ${{ steps.vars.outputs.location }} \
-            || echo "Resource group already exists"
-      
-      - name: Create Container Apps Environment
-        run: |
-          az containerapp env create \
-            --name ${{ steps.vars.outputs.container_app_env }} \
-            --resource-group ${{ steps.vars.outputs.resource_group }} \
-            --location ${{ steps.vars.outputs.location }} \
-            || echo "Container Apps environment already exists"
-      
+            
       - name: Deploy to Azure Container Apps
         run: |
           # Check if container app exists
@@ -200,21 +237,21 @@ jobs:
             az containerapp update \
               --name ${{ steps.vars.outputs.container_app_name }} \
               --resource-group ${{ steps.vars.outputs.resource_group }} \
-              --image ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+              --image ${{ needs.build-and-push.outputs.image_ref }}
           else
             echo "Creating new container app..."
             az containerapp create \
               --name ${{ steps.vars.outputs.container_app_name }} \
               --resource-group ${{ steps.vars.outputs.resource_group }} \
               --environment ${{ steps.vars.outputs.container_app_env }} \
-              --image ghcr.io/${{ github.repository }}:${{ github.ref_name }} \
+              --image ${{ needs.build-and-push.outputs.image_ref }} \
               --target-port 8080 \
               --ingress external \
               --min-replicas 0 \
               --max-replicas 1 \
               --cpu 0.25 \
               --memory 0.5Gi \
-              --env-vars ASPNETCORE_ENVIRONMENT=Production
+              --env-vars ASPNETCORE_ENVIRONMENT=Development
           fi
       
       - name: Get Application URL
@@ -244,7 +281,7 @@ jobs:
           echo "### ⚙️ Configuration" >> $GITHUB_STEP_SUMMARY
           echo "- **Auto-scaling:** 0-1 replicas (scales to zero when idle)" >> $GITHUB_STEP_SUMMARY
           echo "- **Resources:** 0.25 vCPU, 0.5Gi memory" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image:** \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** \`${{ needs.build-and-push.outputs.image_ref }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🧹 Cleanup" >> $GITHUB_STEP_SUMMARY
           echo "To remove this deployment, run the workflow with:" >> $GITHUB_STEP_SUMMARY
