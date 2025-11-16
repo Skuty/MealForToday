@@ -51,9 +51,42 @@ jobs:
       - name: Extract branch name
         id: branch
         run: |
-          BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
+          # Sanitize branch name for Azure Container App naming requirements:
+          # - Must consist of lowercase alphanumeric characters or '-'
+          # - Must start with a letter
+          # - Must end with an alphanumeric character
+          # - Cannot contain '--'
+          # - Must be less than 32 characters total (including environment prefix)
+          
+          RAW_BRANCH="${{ github.ref_name }}"
+          
+          # Convert to lowercase and replace non-alphanumeric with hyphens
+          BRANCH_NAME=$(echo "$RAW_BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
+          
+          # Remove consecutive hyphens
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/--*/-/g')
+          
+          # Remove leading hyphens and non-letters
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/^[^a-z]*//')
+          
+          # Remove trailing hyphens
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/-*$//')
+          
+          # Ensure it starts with a letter (add 'br' prefix if it doesn't)
+          if ! echo "$BRANCH_NAME" | grep -q '^[a-z]'; then
+            BRANCH_NAME="br-${BRANCH_NAME}"
+          fi
+          
+          # Truncate to 20 characters to leave room for "mealfortoday-test-" prefix (11 chars)
+          # Total will be max 31 characters
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | cut -c1-20)
+          
+          # Remove trailing hyphen again if truncation created one
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/-*$//')
+          
           echo "name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          echo "Branch name: $BRANCH_NAME"
+          echo "Original branch: $RAW_BRANCH"
+          echo "Sanitized branch name: $BRANCH_NAME"
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
