@@ -43,10 +43,19 @@ jobs:
       image_tag: ${{ steps.meta.outputs.tags }}
       image_digest: ${{ steps.build.outputs.digest }}
       branch_name: ${{ steps.branch.outputs.name }}
+      image_name: ${{ steps.image.outputs.name }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Convert repository name to lowercase
+        id: image
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "name=ghcr.io/${REPO_LOWER}" >> $GITHUB_OUTPUT
+          echo "Repository: ${{ github.repository }}"
+          echo "Lowercase image name: ghcr.io/${REPO_LOWER}"
       
       - name: Extract branch name
         id: branch
@@ -102,7 +111,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ steps.image.outputs.name }}
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -127,7 +136,7 @@ jobs:
           echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`ghcr.io/${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ steps.image.outputs.name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 Built Image Tags:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
@@ -139,12 +148,12 @@ jobs:
           echo "#### Option 1: Docker Compose (Local/Self-Hosted)" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "# Pull the image" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ steps.image.outputs.name }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "# Run the container" >> $GITHUB_STEP_SUMMARY
           echo "docker run -d -p 8080:8080 \\" >> $GITHUB_STEP_SUMMARY
           echo "  --name mealfortoday-test \\" >> $GITHUB_STEP_SUMMARY
-          echo "  ghcr.io/${{ github.repository }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "  ${{ steps.image.outputs.name }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### Option 2: Azure Container Apps" >> $GITHUB_STEP_SUMMARY
@@ -166,12 +175,12 @@ jobs:
                 issue_number: prNumber,
                 body: `## 🚀 Test Deployment Available\n\n` +
                       `A Docker image has been built and pushed for testing.\n\n` +
-                      `**Image:** \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\`\n\n` +
+                      `**Image:** \`${{ steps.image.outputs.name }}:${{ github.ref_name }}\`\n\n` +
                       `**Environment:** ${{ inputs.environment }}\n\n` +
                       `### Quick Deploy Commands:\n` +
                       `\`\`\`bash\n` +
-                      `docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}\n` +
-                      `docker run -d -p 8080:8080 ghcr.io/${{ github.repository }}:${{ github.ref_name }}\n` +
+                      `docker pull ${{ steps.image.outputs.name }}:${{ github.ref_name }}\n` +
+                      `docker run -d -p 8080:8080 ${{ steps.image.outputs.name }}:${{ github.ref_name }}\n` +
                       `\`\`\`\n\n` +
                       `Access the app at: http://localhost:8080\n\n` +
                       `See [DEPLOYMENT.md](../blob/main/DEPLOYMENT.md) for cloud deployment options.`
@@ -218,14 +227,14 @@ jobs:
             az containerapp update \
               --name ${{ steps.vars.outputs.container_app_name }} \
               --resource-group ${{ steps.vars.outputs.resource_group }} \
-              --image ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+              --image ${{ steps.image.outputs.name }}:${{ github.ref_name }}
           else
             echo "Creating new container app..."
             az containerapp create \
               --name ${{ steps.vars.outputs.container_app_name }} \
               --resource-group ${{ steps.vars.outputs.resource_group }} \
               --environment ${{ steps.vars.outputs.container_app_env }} \
-              --image ghcr.io/${{ github.repository }}:${{ github.ref_name }} \
+              --image ${{ steps.image.outputs.name }}:${{ github.ref_name }} \
               --target-port 8080 \
               --ingress external \
               --min-replicas 0 \
@@ -262,7 +271,7 @@ jobs:
           echo "### ⚙️ Configuration" >> $GITHUB_STEP_SUMMARY
           echo "- **Auto-scaling:** 0-1 replicas (scales to zero when idle)" >> $GITHUB_STEP_SUMMARY
           echo "- **Resources:** 0.25 vCPU, 0.5Gi memory" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image:** \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** \`${{ steps.image.outputs.name }}:${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🧹 Cleanup" >> $GITHUB_STEP_SUMMARY
           echo "To remove this deployment, run the workflow with:" >> $GITHUB_STEP_SUMMARY
