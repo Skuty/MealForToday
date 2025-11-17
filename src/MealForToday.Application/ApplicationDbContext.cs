@@ -32,6 +32,7 @@ namespace MealForToday.Application
             {
                 b.HasKey(x => x.Id);
                 b.Property(x => x.Name).IsRequired();
+                b.HasQueryFilter(x => !x.IsDeleted);
             });
 
             modelBuilder.Entity<MealSchedule>(b =>

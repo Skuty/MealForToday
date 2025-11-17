@@ -1,0 +1,211 @@
+@page "/ingredients"
+@using MealForToday.Application.Models
+@inject MealForToday.Application.Services.IIngredientService IngredientService
+
+<h3>Ingredients Management</h3>
+
+<div class="mb-4">
+    <h4>@(editingIngredient == null ? "Add New Ingredient" : "Edit Ingredient")</h4>
+    <div class="mb-3">
+        <label class="form-label">Name *</label>
+        <input class="form-control" @bind="ingredientName" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" rows="2" @bind="ingredientDescription"></textarea>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Category</label>
+        <input class="form-control" @bind="ingredientCategory" placeholder="e.g., Vegetable, Protein, Dairy" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Default Measurement Unit *</label>
+        <select class="form-select" @bind="ingredientDefaultUnit">
+            <option value="">Select unit...</option>
+            <option value="g">g (grams)</option>
+            <option value="kg">kg (kilograms)</option>
+            <option value="ml">ml (milliliters)</option>
+            <option value="l">l (liters)</option>
+            <option value="tbsp">tbsp (tablespoon)</option>
+            <option value="tsp">tsp (teaspoon)</option>
+            <option value="cup">cup</option>
+            <option value="piece">piece</option>
+            <option value="oz">oz (ounce)</option>
+            <option value="lb">lb (pound)</option>
+        </select>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Calories per 100g (optional)</label>
+        <input type="number" step="0.01" class="form-control" @bind="ingredientCalories" />
+    </div>
+    <div class="mb-3">
+        @if (editingIngredient == null)
+        {
+            <button class="btn btn-primary" @onclick="CreateIngredient">Add Ingredient</button>
+        }
+        else
+        {
+            <button class="btn btn-primary" @onclick="UpdateIngredient">Update Ingredient</button>
+            <button class="btn btn-secondary ms-2" @onclick="CancelEdit">Cancel</button>
+        }
+    </div>
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+</div>
+
+<h4>All Ingredients</h4>
+@if (ingredients == null)
+{
+    <p>Loading...</p>
+}
+else if (!ingredients.Any())
+{
+    <p>No ingredients yet. Add your first ingredient above!</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Default Unit</th>
+                <th>Calories/100g</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var ingredient in ingredients)
+            {
+                <tr>
+                    <td>@ingredient.Name</td>
+                    <td>@ingredient.Description</td>
+                    <td>@ingredient.Category</td>
+                    <td>@ingredient.DefaultUnit</td>
+                    <td>@(ingredient.CaloriesPer100g?.ToString("F2") ?? "-")</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" @onclick="(() => EditIngredient(ingredient))">Edit</button>
+                        <button class="btn btn-sm btn-danger ms-1" @onclick="(() => DeleteIngredient(ingredient.Id))">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Ingredient>? ingredients;
+    private Ingredient? editingIngredient;
+    private string ingredientName = string.Empty;
+    private string ingredientDescription = string.Empty;
+    private string ingredientCategory = string.Empty;
+    private string ingredientDefaultUnit = string.Empty;
+    private decimal? ingredientCalories;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadIngredients();
+    }
+
+    private async Task LoadIngredients()
+    {
+        ingredients = await IngredientService.GetAllAsync();
+    }
+
+    private async Task CreateIngredient()
+    {
+        errorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(ingredientName))
+        {
+            errorMessage = "Name is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ingredientDefaultUnit))
+        {
+            errorMessage = "Default measurement unit is required.";
+            return;
+        }
+
+        var ingredient = new Ingredient
+        {
+            Name = ingredientName.Trim(),
+            Description = string.IsNullOrWhiteSpace(ingredientDescription) ? null : ingredientDescription.Trim(),
+            Category = string.IsNullOrWhiteSpace(ingredientCategory) ? null : ingredientCategory.Trim(),
+            DefaultUnit = ingredientDefaultUnit,
+            CaloriesPer100g = ingredientCalories,
+            IsStandard = true
+        };
+
+        await IngredientService.CreateAsync(ingredient);
+        ClearForm();
+        await LoadIngredients();
+    }
+
+    private async Task UpdateIngredient()
+    {
+        if (editingIngredient == null) return;
+
+        errorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(ingredientName))
+        {
+            errorMessage = "Name is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ingredientDefaultUnit))
+        {
+            errorMessage = "Default measurement unit is required.";
+            return;
+        }
+
+        editingIngredient.Name = ingredientName.Trim();
+        editingIngredient.Description = string.IsNullOrWhiteSpace(ingredientDescription) ? null : ingredientDescription.Trim();
+        editingIngredient.Category = string.IsNullOrWhiteSpace(ingredientCategory) ? null : ingredientCategory.Trim();
+        editingIngredient.DefaultUnit = ingredientDefaultUnit;
+        editingIngredient.CaloriesPer100g = ingredientCalories;
+
+        await IngredientService.UpdateAsync(editingIngredient);
+        ClearForm();
+        await LoadIngredients();
+    }
+
+    private void EditIngredient(Ingredient ingredient)
+    {
+        editingIngredient = ingredient;
+        ingredientName = ingredient.Name;
+        ingredientDescription = ingredient.Description ?? string.Empty;
+        ingredientCategory = ingredient.Category ?? string.Empty;
+        ingredientDefaultUnit = ingredient.DefaultUnit ?? string.Empty;
+        ingredientCalories = ingredient.CaloriesPer100g;
+        errorMessage = string.Empty;
+    }
+
+    private void CancelEdit()
+    {
+        ClearForm();
+    }
+
+    private async Task DeleteIngredient(Guid id)
+    {
+        await IngredientService.DeleteAsync(id);
+        await LoadIngredients();
+    }
+
+    private void ClearForm()
+    {
+        editingIngredient = null;
+        ingredientName = string.Empty;
+        ingredientDescription = string.Empty;
+        ingredientCategory = string.Empty;
+        ingredientDefaultUnit = string.Empty;
+        ingredientCalories = null;
+        errorMessage = string.Empty;
+    }
+}
