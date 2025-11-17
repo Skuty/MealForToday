@@ -178,24 +178,35 @@ jobs:
         with:
           script: |
             const prNumber = context.payload.pull_request?.number || '${{ inputs.pr_number }}';
-            if (prNumber) {
-              github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: `## 🚀 Test Deployment Available\n\n` +
-                      `A Docker image has been built and pushed for testing.\n\n` +
-                      `**Image:** \`${{ steps.image.outputs.name }}:${{ github.ref_name }}\`\n\n` +
-                      `**Environment:** ${{ inputs.environment }}\n\n` +
-                      `### Quick Deploy Commands:\n` +
-                      `\`\`\`bash\n` +
-                      `docker pull ${{ steps.image.outputs.name }}:${{ github.ref_name }}\n` +
-                      `docker run -d -p 8080:8080 ${{ steps.image.outputs.name }}:${{ github.ref_name }}\n` +
-                      `\`\`\`\n\n` +
-                      `Access the app at: http://localhost:8080\n\n` +
-                      `See [DEPLOYMENT.md](../blob/main/DEPLOYMENT.md) for cloud deployment options.`
-              });
+            
+            // Validate PR number exists and is valid before attempting to comment
+            if (!prNumber || prNumber === '') {
+              console.log('No PR number found, skipping comment');
+              return;
             }
+            
+            const prNumberInt = typeof prNumber === 'number' ? prNumber : parseInt(prNumber, 10);
+            if (isNaN(prNumberInt)) {
+              console.log('Invalid PR number, skipping comment');
+              return;
+            }
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumberInt,
+              body: `## 🚀 Test Deployment Available\n\n` +
+                    `A Docker image has been built and pushed for testing.\n\n` +
+                    `**Image:** \`${{ steps.image.outputs.name }}:${{ github.ref_name }}\`\n\n` +
+                    `**Environment:** ${{ inputs.environment }}\n\n` +
+                    `### Quick Deploy Commands:\n` +
+                    `\`\`\`bash\n` +
+                    `docker pull ${{ steps.image.outputs.name }}:${{ github.ref_name }}\n` +
+                    `docker run -d -p 8080:8080 ${{ steps.image.outputs.name }}:${{ github.ref_name }}\n` +
+                    `\`\`\`\n\n` +
+                    `Access the app at: http://localhost:8080\n\n` +
+                    `See [DEPLOYMENT.md](../blob/main/DEPLOYMENT.md) for cloud deployment options.`
+            });
   
   deploy-to-azure:
     if: inputs.action == 'deploy' && inputs.deploy_to_azure == true
@@ -336,10 +347,22 @@ jobs:
           script: |
             const prNumber = '${{ steps.pr.outputs.result }}';
             
+            // Validate PR number exists and is valid before attempting to comment
+            if (!prNumber || prNumber.trim() === '') {
+              console.log('No PR number found, skipping comment');
+              return;
+            }
+            
+            const prNumberInt = parseInt(prNumber, 10);
+            if (isNaN(prNumberInt)) {
+              console.log('Invalid PR number, skipping comment');
+              return;
+            }
+            
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: parseInt(prNumber),
+              issue_number: prNumberInt,
               body: `## ☁️ Azure Container Apps Deployment\n\n` +
                     `✅ Successfully deployed to Azure Container Apps!\n\n` +
                     `**Application URL:** [${{ steps.url.outputs.url }}](${{ steps.url.outputs.url }})\n\n` +
@@ -491,6 +514,18 @@ jobs:
             const deletedCount = '${{ steps.cleanup.outputs.deleted_count }}';
             const deletedApps = '${{ steps.cleanup.outputs.deleted_apps }}';
             
+            // Validate PR number exists and is valid before attempting to comment
+            if (!prNumber || prNumber.trim() === '') {
+              console.log('No PR number found, skipping comment');
+              return;
+            }
+            
+            const prNumberInt = parseInt(prNumber, 10);
+            if (isNaN(prNumberInt)) {
+              console.log('Invalid PR number, skipping comment');
+              return;
+            }
+            
             let message = `## 🧹 Cleanup Complete\n\n` +
                          `✅ Successfully cleaned up Azure Container Apps.\n\n` +
                          `**Environment:** ${{ inputs.environment }}\n` +
@@ -503,6 +538,6 @@ jobs:
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: parseInt(prNumber),
+              issue_number: prNumberInt,
               body: message
             });
