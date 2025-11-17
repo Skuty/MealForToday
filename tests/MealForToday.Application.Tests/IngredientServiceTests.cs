@@ -154,5 +154,92 @@ namespace MealForToday.Application.Tests
             var all = await repo.GetAllIncludingDeletedAsync();
             Assert.Empty(all);
         }
+
+        [Fact]
+        public async Task CanRestoreSoftDeletedIngredient()
+        {
+            using var db = CreateContext();
+            var repo = new EfIngredientRepository(db);
+
+            var ingredient = new Ingredient { Name = "To Be Restored", DefaultUnit = "g" };
+            await repo.AddAsync(ingredient);
+
+            // Soft delete the ingredient
+            await repo.DeleteAsync(ingredient.Id);
+
+            // Verify it's not in active list
+            var active = await repo.GetAllAsync();
+            Assert.Empty(active);
+
+            // Restore the ingredient
+            await repo.RestoreAsync(ingredient.Id);
+
+            // Verify it's back in active list
+            var restored = await repo.GetAllAsync();
+            Assert.Single(restored);
+            Assert.Equal("To Be Restored", restored[0].Name);
+            Assert.False(restored[0].IsDeleted);
+            Assert.Null(restored[0].DeletedAt);
+        }
+
+        [Fact]
+        public async Task InventoryArchetypeTracksCreationTime()
+        {
+            using var db = CreateContext();
+            var repo = new EfIngredientRepository(db);
+
+            var beforeCreate = DateTime.UtcNow;
+            var ingredient = new Ingredient { Name = "Tracked Ingredient", DefaultUnit = "ml" };
+            await repo.AddAsync(ingredient);
+            var afterCreate = DateTime.UtcNow;
+
+            var retrieved = await repo.GetByIdAsync(ingredient.Id);
+            Assert.NotNull(retrieved);
+            Assert.True(retrieved.CreatedAt >= beforeCreate && retrieved.CreatedAt <= afterCreate);
+        }
+
+        [Fact]
+        public async Task InventoryArchetypeTracksModificationTime()
+        {
+            using var db = CreateContext();
+            var repo = new EfIngredientRepository(db);
+
+            var ingredient = new Ingredient { Name = "Original", DefaultUnit = "g" };
+            await repo.AddAsync(ingredient);
+
+            // Wait a tiny bit to ensure timestamp difference
+            await Task.Delay(10);
+
+            ingredient.Name = "Modified";
+            await repo.UpdateAsync(ingredient);
+
+            var retrieved = await repo.GetByIdAsync(ingredient.Id);
+            Assert.NotNull(retrieved);
+            Assert.NotNull(retrieved.LastModifiedAt);
+            Assert.True(retrieved.LastModifiedAt > retrieved.CreatedAt);
+        }
+
+        [Fact]
+        public async Task InventoryArchetypeTracksDeletionTime()
+        {
+            using var db = CreateContext();
+            var repo = new EfIngredientRepository(db);
+
+            var ingredient = new Ingredient { Name = "To Delete", DefaultUnit = "kg" };
+            await repo.AddAsync(ingredient);
+
+            var beforeDelete = DateTime.UtcNow;
+            await repo.DeleteAsync(ingredient.Id);
+            var afterDelete = DateTime.UtcNow;
+
+            var deleted = await db.Ingredients
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == ingredient.Id);
+
+            Assert.NotNull(deleted);
+            Assert.True(deleted.IsDeleted);
+            Assert.NotNull(deleted.DeletedAt);
+            Assert.True(deleted.DeletedAt >= beforeDelete && deleted.DeletedAt <= afterDelete);
+        }
     }
 }

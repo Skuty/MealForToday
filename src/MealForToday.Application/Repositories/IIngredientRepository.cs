@@ -5,14 +5,12 @@ using MealForToday.Application.Models;
 
 namespace MealForToday.Application.Repositories
 {
-    public interface IIngredientRepository
+    /// <summary>
+    /// Repository interface for Ingredient entities.
+    /// Implements the Inventory archetype pattern through IInventoryRepository.
+    /// </summary>
+    public interface IIngredientRepository : IInventoryRepository<Ingredient>
     {
-        Task<Ingredient?> GetByIdAsync(Guid id);
-        Task<List<Ingredient>> GetAllAsync();
-        Task<List<Ingredient>> GetAllIncludingDeletedAsync();
-        Task AddAsync(Ingredient ingredient);
-        Task UpdateAsync(Ingredient ingredient);
-        Task DeleteAsync(Guid id);
-        Task HardDeleteAsync(Guid id);
+        // Additional ingredient-specific methods can be added here if needed
     }
 }

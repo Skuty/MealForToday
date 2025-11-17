@@ -7,61 +7,18 @@ using MealForToday.Application.Models;
 
 namespace MealForToday.Application.Repositories
 {
-    public class EfIngredientRepository : IIngredientRepository
+    /// <summary>
+    /// EF Core repository for Ingredient entities.
+    /// Inherits from EfInventoryRepository to leverage the Inventory archetype pattern.
+    /// </summary>
+    public class EfIngredientRepository : EfInventoryRepository<Ingredient>, IIngredientRepository
     {
-        private readonly ApplicationDbContext _db;
-
-        public EfIngredientRepository(ApplicationDbContext db)
+        public EfIngredientRepository(ApplicationDbContext db) : base(db)
         {
-            _db = db;
         }
 
-        public async Task AddAsync(Ingredient ingredient)
-        {
-            _db.Ingredients.Add(ingredient);
-            await _db.SaveChangesAsync();
-        }
+        protected override DbSet<Ingredient> DbSet => _db.Ingredients;
 
-        public async Task DeleteAsync(Guid id)
-        {
-            var e = await _db.Ingredients.FindAsync(id);
-            if (e != null)
-            {
-                e.IsDeleted = true;
-                e.DeletedAt = DateTime.UtcNow;
-                await _db.SaveChangesAsync();
-            }
-        }
-
-        public async Task HardDeleteAsync(Guid id)
-        {
-            var e = await _db.Ingredients.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == id);
-            if (e != null)
-            {
-                _db.Ingredients.Remove(e);
-                await _db.SaveChangesAsync();
-            }
-        }
-
-        public async Task<List<Ingredient>> GetAllAsync()
-        {
-            return await _db.Ingredients.AsNoTracking().ToListAsync();
-        }
-
-        public async Task<List<Ingredient>> GetAllIncludingDeletedAsync()
-        {
-            return await _db.Ingredients.IgnoreQueryFilters().AsNoTracking().ToListAsync();
-        }
-
-        public async Task<Ingredient?> GetByIdAsync(Guid id)
-        {
-            return await _db.Ingredients.FindAsync(id);
-        }
-
-        public async Task UpdateAsync(Ingredient ingredient)
-        {
-            _db.Ingredients.Update(ingredient);
-            await _db.SaveChangesAsync();
-        }
+        // Additional ingredient-specific methods can be added here if needed
     }
 }

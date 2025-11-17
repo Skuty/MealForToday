@@ -2,16 +2,20 @@ using System;
 
 namespace MealForToday.Application.Models
 {
-    public class Ingredient
+    /// <summary>
+    /// Ingredient entity implementing the Inventory archetype pattern.
+    /// Represents a food ingredient that can be tracked and managed in the system's inventory.
+    /// </summary>
+    public class Ingredient : InventoryItem
     {
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public string? Category { get; set; }
+        /// <summary>
+        /// Default unit of measurement for this ingredient (e.g., g, ml, piece)
+        /// </summary>
         public string? DefaultUnit { get; set; }
+
+        /// <summary>
+        /// Nutritional information: calories per 100g of the ingredient
+        /// </summary>
         public decimal? CaloriesPer100g { get; set; }
-        public bool IsStandard { get; set; }
-        public bool IsDeleted { get; set; }
-        public DateTime? DeletedAt { get; set; }
     }
 }
