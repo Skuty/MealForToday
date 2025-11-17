@@ -10,22 +10,24 @@ namespace MealForToday.Application.Repositories
     /// <summary>
     /// Generic EF Core repository implementing the Inventory archetype pattern.
     /// Provides reusable CRUD operations with soft delete support for any InventoryItem.
-    /// This base class can be inherited by specific repository implementations.
+    /// Can be used directly or inherited by specific repository implementations.
     /// </summary>
     /// <typeparam name="T">The inventory item type</typeparam>
-    public abstract class EfInventoryRepository<T> : IInventoryRepository<T> where T : InventoryItem
+    public class EfInventoryRepository<T> : IInventoryRepository<T> where T : InventoryItem
     {
         protected readonly ApplicationDbContext _db;
+        private readonly Func<ApplicationDbContext, DbSet<T>> _dbSetAccessor;
 
-        protected EfInventoryRepository(ApplicationDbContext db)
+        public EfInventoryRepository(ApplicationDbContext db, Func<ApplicationDbContext, DbSet<T>> dbSetAccessor)
         {
             _db = db;
+            _dbSetAccessor = dbSetAccessor;
         }
 
         /// <summary>
         /// Gets the DbSet for the specific inventory item type
         /// </summary>
-        protected abstract DbSet<T> DbSet { get; }
+        protected virtual DbSet<T> DbSet => _dbSetAccessor(_db);
 
         public virtual async Task<T?> GetByIdAsync(Guid id)
         {

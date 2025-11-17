@@ -8,9 +8,9 @@ namespace MealForToday.Application.Services
 {
     public class IngredientService : IIngredientService
     {
-        private readonly IIngredientRepository _repo;
+        private readonly IInventoryRepository<Ingredient> _repo;
 
-        public IngredientService(IIngredientRepository repo)
+        public IngredientService(IInventoryRepository<Ingredient> repo)
         {
             _repo = repo;
         }

@@ -60,27 +60,25 @@
 │                                    ▲                                         │
 │                                    │ implements                              │
 │  ┌──────────────────────────────────────────────────────────────┐           │
-│  │     EfInventoryRepository<T> (Abstract Base)                 │           │
+│  │     EfInventoryRepository<T> (Concrete Generic)              │           │
 │  ├──────────────────────────────────────────────────────────────┤           │
 │  │  # _db: ApplicationDbContext                                 │           │
-│  │  # DbSet: DbSet<T> (abstract)                                │           │
+│  │  # DbSet: DbSet<T> (via constructor delegate)                │           │
+│  │  + Constructor(db, dbSetAccessor)                            │           │
 │  │  + Implements all IInventoryRepository<T> methods            │           │
 │  │  + Automatic soft delete filtering via EF Query Filters      │           │
 │  │  + Automatic temporal tracking on updates                    │           │
 │  └──────────────────────────────────────────────────────────────┘           │
-│                                    ▲                                         │
-│                                    │ extends                                 │
+│                                    │                                         │
+│                                    │ used directly for                       │
 │                     ┌──────────────┴──────────────┐                         │
 │                     │                              │                         │
 │          ┌────────────────────┐        ┌────────────────────┐              │
-│          │ IIngredientRepo    │        │ IRecipeRepository  │              │
-│          │ : IInventoryRepo   │        │ : IInventoryRepo   │              │
+│          │ Ingredient         │        │ Recipe             │              │
+│          │ IInventoryRepo<I>  │        │ IInventoryRepo<R>  │              │
 │          └────────────────────┘        └────────────────────┘              │
-│                     ▲                              ▲                         │
-│          ┌────────────────────┐        ┌────────────────────┐              │
-│          │ EfIngredientRepo   │        │ EfRecipeRepository │              │
-│          │ : EfInventoryRepo  │        │ : EfInventoryRepo  │              │
-│          └────────────────────┘        └────────────────────┘              │
+│                                                                              │
+│  Note: No concrete repository types needed. Use generic directly.           │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 
@@ -122,32 +120,21 @@ public class Recipe : InventoryItem
     public string? Instructions { get; set; }
 }
 
-// Step 2: Create Repository Interface
-public interface IRecipeRepository : IInventoryRepository<Recipe>
-{
-    // Add recipe-specific methods here if needed
-}
+// Step 2: Register in DI Container (Program.cs)
+builder.Services.AddScoped<IInventoryRepository<Recipe>>(
+    sp => new EfInventoryRepository<Recipe>(
+        sp.GetRequiredService<ApplicationDbContext>(),
+        db => db.Recipes
+    )
+);
 
-// Step 3: Create Repository Implementation
-public class EfRecipeRepository : EfInventoryRepository<Recipe>, IRecipeRepository
-{
-    public EfRecipeRepository(ApplicationDbContext db) : base(db) { }
-    
-    protected override DbSet<Recipe> DbSet => _db.Recipes;
-    
-    // Add recipe-specific implementations here if needed
-}
-
-// Step 4: Configure in DbContext
+// Step 3: Configure in DbContext
 modelBuilder.Entity<Recipe>(b =>
 {
     b.HasKey(x => x.Id);
     b.Property(x => x.Name).IsRequired();
     b.HasQueryFilter(x => !x.IsDeleted);  // Enable soft delete
 });
-
-// Step 5: Register in DI Container (Program.cs)
-builder.Services.AddScoped<IRecipeRepository, EfRecipeRepository>();
 ```
 
 That's it! Recipe now has:

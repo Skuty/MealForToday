@@ -19,11 +19,16 @@ namespace MealForToday.Application.Tests
             return new ApplicationDbContext(options);
         }
 
+        private IInventoryRepository<Ingredient> CreateRepository(ApplicationDbContext db)
+        {
+            return new EfInventoryRepository<Ingredient>(db, context => context.Ingredients);
+        }
+
         [Fact]
         public async Task CanCreateAndRetrieveIngredient()
         {
             using var db = CreateContext();
-            var repo = new EfIngredientRepository(db);
+            var repo = CreateRepository(db);
             var service = new IngredientService(repo);
 
             var ingredient = new Ingredient 
@@ -46,7 +51,7 @@ namespace MealForToday.Application.Tests
         public async Task SoftDeleteHidesIngredientFromGetAll()
         {
             using var db = CreateContext();
-            var repo = new EfIngredientRepository(db);
+            var repo = CreateRepository(db);
             var service = new IngredientService(repo);
 
             var ingredient = new Ingredient { Name = "Test Ingredient", DefaultUnit = "g" };
@@ -65,7 +70,7 @@ namespace MealForToday.Application.Tests
         public async Task SoftDeletePreservesIngredientData()
         {
             using var db = CreateContext();
-            var repo = new EfIngredientRepository(db);
+            var repo = CreateRepository(db);
             var service = new IngredientService(repo);
 
             var ingredient = new Ingredient 
@@ -94,7 +99,7 @@ namespace MealForToday.Application.Tests
         public async Task CanUpdateIngredient()
         {
             using var db = CreateContext();
-            var repo = new EfIngredientRepository(db);
+            var repo = CreateRepository(db);
             var service = new IngredientService(repo);
 
             var ingredient = new Ingredient 
@@ -121,7 +126,7 @@ namespace MealForToday.Application.Tests
         public async Task GetAllIncludingDeletedReturnsAllIngredients()
         {
             using var db = CreateContext();
-            var repo = new EfIngredientRepository(db);
+            var repo = CreateRepository(db);
 
             var ingredient1 = new Ingredient { Name = "Active", DefaultUnit = "g" };
             var ingredient2 = new Ingredient { Name = "Deleted", DefaultUnit = "kg" };
@@ -144,7 +149,7 @@ namespace MealForToday.Application.Tests
         public async Task HardDeletePermanentlyRemovesIngredient()
         {
             using var db = CreateContext();
-            var repo = new EfIngredientRepository(db);
+            var repo = CreateRepository(db);
 
             var ingredient = new Ingredient { Name = "To Be Hard Deleted", DefaultUnit = "ml" };
             await repo.AddAsync(ingredient);
@@ -159,7 +164,7 @@ namespace MealForToday.Application.Tests
         public async Task CanRestoreSoftDeletedIngredient()
         {
             using var db = CreateContext();
-            var repo = new EfIngredientRepository(db);
+            var repo = CreateRepository(db);
 
             var ingredient = new Ingredient { Name = "To Be Restored", DefaultUnit = "g" };
             await repo.AddAsync(ingredient);
@@ -186,7 +191,7 @@ namespace MealForToday.Application.Tests
         public async Task InventoryArchetypeTracksCreationTime()
         {
             using var db = CreateContext();
-            var repo = new EfIngredientRepository(db);
+            var repo = CreateRepository(db);
 
             var beforeCreate = DateTime.UtcNow;
             var ingredient = new Ingredient { Name = "Tracked Ingredient", DefaultUnit = "ml" };
@@ -202,7 +207,7 @@ namespace MealForToday.Application.Tests
         public async Task InventoryArchetypeTracksModificationTime()
         {
             using var db = CreateContext();
-            var repo = new EfIngredientRepository(db);
+            var repo = CreateRepository(db);
 
             var ingredient = new Ingredient { Name = "Original", DefaultUnit = "g" };
             await repo.AddAsync(ingredient);
@@ -223,7 +228,7 @@ namespace MealForToday.Application.Tests
         public async Task InventoryArchetypeTracksDeletionTime()
         {
             using var db = CreateContext();
-            var repo = new EfIngredientRepository(db);
+            var repo = CreateRepository(db);
 
             var ingredient = new Ingredient { Name = "To Delete", DefaultUnit = "kg" };
             await repo.AddAsync(ingredient);

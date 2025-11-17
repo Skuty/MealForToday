@@ -31,11 +31,10 @@ InventoryItem (abstract base class)
 
 ```
 IInventoryRepository<T> (generic interface)
-└── EfInventoryRepository<T> (generic implementation)
-    ├── IIngredientRepository : IInventoryRepository<Ingredient>
-    │   └── EfIngredientRepository : EfInventoryRepository<Ingredient>
-    ├── IRecipeRepository : IInventoryRepository<Recipe> (future)
-    └── IMealRepository : IInventoryRepository<Meal> (future)
+└── EfInventoryRepository<T> (concrete generic implementation)
+    ├── Used directly for Ingredient: IInventoryRepository<Ingredient>
+    ├── Used directly for Recipe (future): IInventoryRepository<Recipe>
+    └── Used directly for Meal (future): IInventoryRepository<Meal>
 ```
 
 ## Implementation Files
@@ -54,8 +53,9 @@ IInventoryRepository<T> (generic interface)
    - 8 standard operations (CRUD + soft delete + restore)
    - Works with any InventoryItem type
 
-3. **Repositories/EfInventoryRepository.cs** - Generic EF Core implementation
+3. **Repositories/EfInventoryRepository.cs** - Concrete generic EF Core implementation
    - 90 lines of reusable code
+   - Can be used directly without creating concrete types
    - Automatic query filtering for soft deletes
    - Automatic temporal tracking on updates
    - Restore functionality for soft-deleted items
@@ -67,14 +67,13 @@ IInventoryRepository<T> (generic interface)
    - Inherits all inventory features from InventoryItem
    - Only adds domain-specific properties (DefaultUnit, CaloriesPer100g)
 
-5. **Repositories/IIngredientRepository.cs** - Ingredient repository interface
-   - 8 lines (minimal code thanks to inheritance)
-   - Extends IInventoryRepository<Ingredient>
+5. **Services/IngredientService.cs** - Ingredient service
+   - Uses IInventoryRepository<Ingredient> directly
+   - No concrete repository type needed
 
-6. **Repositories/EfIngredientRepository.cs** - Ingredient repository implementation
-   - 12 lines (minimal code thanks to inheritance)
-   - Extends EfInventoryRepository<Ingredient>
-   - Only specifies DbSet
+6. **Program.cs** - DI registration
+   - Registers EfInventoryRepository<Ingredient> with DbSet accessor
+   - Simple lambda to specify the DbSet
 
 ### UI Files
 
@@ -113,14 +112,13 @@ IInventoryRepository<T> (generic interface)
 |-----------|--------------|----------|-------------|
 | InventoryItem | 80 | Yes | Base class for all inventory items |
 | IInventoryRepository<T> | 60 | Yes | Generic repository interface |
-| EfInventoryRepository<T> | 90 | Yes | Generic repository implementation |
+| EfInventoryRepository<T> | 90 | Yes | Concrete generic repository implementation |
 | Ingredient | 10 | No | Ingredient-specific model |
-| IIngredientRepository | 8 | No | Ingredient repository interface |
-| EfIngredientRepository | 12 | No | Ingredient repository implementation |
+| DI Registration | 5 | No | Register generic repo for Ingredient |
 | **Total Reusable** | **230** | - | Can be used for unlimited entity types |
-| **Total Specific** | **30** | - | Ingredient-specific code |
+| **Total Specific** | **15** | - | Ingredient-specific code (model + DI) |
 
-**Result**: 230 lines of reusable code supports any number of future inventory types, each requiring only ~30 lines of specific code.
+**Result**: 230 lines of reusable code supports any number of future inventory types, each requiring only ~15 lines of specific code (model + DI registration).
 
 ## Testing
 
@@ -156,29 +154,30 @@ public class Recipe : InventoryItem
     public string? Instructions { get; set; }
 }
 
-// ~8 lines - Repository Interface
-public interface IRecipeRepository : IInventoryRepository<Recipe> { }
-
-// ~12 lines - Repository Implementation
-public class EfRecipeRepository : EfInventoryRepository<Recipe>, IRecipeRepository
-{
-    protected override DbSet<Recipe> DbSet => _db.Recipes;
-}
+// ~5 lines - DI Registration
+builder.Services.AddScoped<IInventoryRepository<Recipe>>(
+    sp => new EfInventoryRepository<Recipe>(
+        sp.GetRequiredService<ApplicationDbContext>(),
+        db => db.Recipes
+    )
+);
 
 // ~5 lines - DbContext Configuration
 modelBuilder.Entity<Recipe>(b => {
+    b.HasKey(x => x.Id);
+    b.Property(x => x.Name).IsRequired();
     b.HasQueryFilter(x => !x.IsDeleted);
 });
 ```
 
-**Result**: ~35 lines of code gets you a fully-functional inventory type with soft delete, restore, audit trail, and temporal tracking.
+**Result**: ~20 lines of code gets you a fully-functional inventory type with soft delete, restore, audit trail, and temporal tracking.
 
 ## Benefits Realized
 
 ### 1. Reusability
 - 230 lines of code supports unlimited entity types
-- Each new type requires only ~30 lines of code
-- 87% code reuse ratio
+- Each new type requires only ~15 lines of code (model + DI registration)
+- 94% code reuse ratio
 
 ### 2. Consistency
 - All inventory items behave identically
@@ -215,12 +214,13 @@ modelBuilder.Entity<Recipe>(b => {
 
 The Inventory Archetype pattern provides:
 
-1. **Minimal Code**: ~30 lines per new inventory type
-2. **Maximum Reusability**: 87% code reuse
-3. **Complete Features**: Soft delete, restore, audit trail, temporal tracking
-4. **Future-Ready**: Easy to add Meal, Recipe, Shopping List, Equipment, etc.
-5. **Well-Documented**: Comprehensive guides and examples
-6. **Tested**: 12 passing tests covering all features
-7. **Secure**: No vulnerabilities detected
+1. **Minimal Code**: ~15 lines per new inventory type (just model + DI registration)
+2. **Maximum Reusability**: 94% code reuse
+3. **No Boilerplate**: Use generic repository directly, no concrete types needed
+4. **Complete Features**: Soft delete, restore, audit trail, temporal tracking
+5. **Future-Ready**: Easy to add Meal, Recipe, Shopping List, Equipment, etc.
+6. **Well-Documented**: Comprehensive guides and examples
+7. **Tested**: 12 passing tests covering all features
+8. **Secure**: No vulnerabilities detected
 
 This implementation fully satisfies the requirement to "use inventory archetype to implement this feature" with a "base for this feature should be reusable for future."

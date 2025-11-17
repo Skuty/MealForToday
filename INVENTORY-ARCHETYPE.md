@@ -123,9 +123,36 @@ Soft delete ensures:
 
 ## Usage Examples
 
+### Using the Generic Repository Directly
+
+The generic repository can be used directly without creating concrete repository types:
+
+```csharp
+// In Program.cs (DI registration)
+builder.Services.AddScoped<IInventoryRepository<Ingredient>>(
+    sp => new EfInventoryRepository<Ingredient>(
+        sp.GetRequiredService<ApplicationDbContext>(),
+        db => db.Ingredients
+    )
+);
+
+// In Service
+public class IngredientService : IIngredientService
+{
+    private readonly IInventoryRepository<Ingredient> _repo;
+    
+    public IngredientService(IInventoryRepository<Ingredient> repo)
+    {
+        _repo = repo;
+    }
+    
+    // Use repository methods directly
+}
+```
+
 ### Creating a New Inventory Type
 
-To add a new inventory type (e.g., Recipe):
+To add a new inventory type (e.g., Recipe), simply:
 
 ```csharp
 // 1. Create the model
@@ -135,20 +162,15 @@ public class Recipe : InventoryItem
     public string? Instructions { get; set; }
 }
 
-// 2. Create the repository interface
-public interface IRecipeRepository : IInventoryRepository<Recipe>
-{
-    // Add recipe-specific methods if needed
-}
+// 2. Register in DI container
+builder.Services.AddScoped<IInventoryRepository<Recipe>>(
+    sp => new EfInventoryRepository<Recipe>(
+        sp.GetRequiredService<ApplicationDbContext>(),
+        db => db.Recipes
+    )
+);
 
-// 3. Create the repository implementation
-public class EfRecipeRepository : EfInventoryRepository<Recipe>, IRecipeRepository
-{
-    public EfRecipeRepository(ApplicationDbContext db) : base(db) { }
-    protected override DbSet<Recipe> DbSet => _db.Recipes;
-}
-
-// 4. Configure in DbContext
+// 3. Configure in DbContext
 modelBuilder.Entity<Recipe>(b =>
 {
     b.HasKey(x => x.Id);
@@ -156,6 +178,8 @@ modelBuilder.Entity<Recipe>(b =>
     b.HasQueryFilter(x => !x.IsDeleted);  // Enable soft delete
 });
 ```
+
+That's it! No need to create concrete repository interfaces or implementations.
 
 ### Using the Repository
 
