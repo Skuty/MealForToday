@@ -2,6 +2,108 @@
 
 <PageTitle>Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="home-container">
+    <div class="hero-section">
+        <h1 class="display-3 fw-bold text-center mb-4">
+            <span class="food-icon">🍽️</span> Meal For Today
+        </h1>
+        <p class="lead text-center mb-5">
+            Your personal meal planning assistant - making mealtime decisions easier!
+        </p>
+    </div>
 
-Welcome to your new app.
+    <div class="food-showcase text-center mb-5">
+        <div class="food-icons">
+            <span class="food-emoji">🍕</span>
+            <span class="food-emoji">🍔</span>
+            <span class="food-emoji">🍜</span>
+            <span class="food-emoji">🥗</span>
+            <span class="food-emoji">🍱</span>
+            <span class="food-emoji">🌮</span>
+            <span class="food-emoji">🍝</span>
+            <span class="food-emoji">🥘</span>
+        </div>
+    </div>
+
+    <div class="navigation-hint text-center">
+        <div class="card shadow-sm mx-auto" style="max-width: 600px;">
+            <div class="card-body p-4">
+                <h5 class="card-title mb-3">
+                    <span class="bi bi-compass"></span> Get Started
+                </h5>
+                <p class="card-text mb-0">
+                    Use the <strong>navigation menu</strong> on the left to explore the application 
+                    and start planning your meals!
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .home-container {
+        padding: 2rem 1rem;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .hero-section {
+        margin-top: 3rem;
+    }
+
+    .food-icon {
+        font-size: 3rem;
+        display: inline-block;
+        animation: bounce 2s ease-in-out infinite;
+    }
+
+    @@keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+
+    .food-showcase {
+        padding: 2rem 0;
+    }
+
+    .food-icons {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+    }
+
+    .food-emoji {
+        font-size: 3.5rem;
+        transition: transform 0.3s ease;
+        cursor: default;
+    }
+
+    .food-emoji:hover {
+        transform: scale(1.2) rotate(10deg);
+    }
+
+    .navigation-hint {
+        margin-top: 4rem;
+    }
+
+    .card {
+        border: 2px solid var(--bs-primary);
+        background: linear-gradient(135deg, rgba(13, 110, 253, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
+    }
+
+    .card-title {
+        color: var(--bs-primary);
+        font-weight: 600;
+    }
+
+    @@media (max-width: 768px) {
+        .food-emoji {
+            font-size: 2.5rem;
+        }
+        
+        .food-icon {
+            font-size: 2rem;
+        }
+    }
+</style>
