@@ -27,6 +27,17 @@ namespace MealForToday.Application.Repositories
             var e = await _db.Ingredients.FindAsync(id);
             if (e != null)
             {
+                e.IsDeleted = true;
+                e.DeletedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        public async Task HardDeleteAsync(Guid id)
+        {
+            var e = await _db.Ingredients.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == id);
+            if (e != null)
+            {
                 _db.Ingredients.Remove(e);
                 await _db.SaveChangesAsync();
             }
@@ -35,6 +46,11 @@ namespace MealForToday.Application.Repositories
         public async Task<List<Ingredient>> GetAllAsync()
         {
             return await _db.Ingredients.AsNoTracking().ToListAsync();
+        }
+
+        public async Task<List<Ingredient>> GetAllIncludingDeletedAsync()
+        {
+            return await _db.Ingredients.IgnoreQueryFilters().AsNoTracking().ToListAsync();
         }
 
         public async Task<Ingredient?> GetByIdAsync(Guid id)

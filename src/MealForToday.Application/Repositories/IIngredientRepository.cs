@@ -9,8 +9,10 @@ namespace MealForToday.Application.Repositories
     {
         Task<Ingredient?> GetByIdAsync(Guid id);
         Task<List<Ingredient>> GetAllAsync();
+        Task<List<Ingredient>> GetAllIncludingDeletedAsync();
         Task AddAsync(Ingredient ingredient);
         Task UpdateAsync(Ingredient ingredient);
         Task DeleteAsync(Guid id);
+        Task HardDeleteAsync(Guid id);
     }
 }
