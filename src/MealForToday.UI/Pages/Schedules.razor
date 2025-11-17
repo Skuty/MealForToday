@@ -6,9 +6,9 @@
 
 <div class="mb-3">
     <label class="form-label">Start Date</label>
-    <input type="date" class="form-control" @bind="startDateString" />
+    <input type="date" class="form-control" @bind="startDate" @bind:format="yyyy-MM-dd" />
     <label class="form-label mt-2">End Date</label>
-    <input type="date" class="form-control" @bind="endDateString" />
+    <input type="date" class="form-control" @bind="endDate" @bind:format="yyyy-MM-dd" />
     <label class="form-label mt-2">Meals per day</label>
     <input type="number" class="form-control" @bind="mealsPerDay" min="1" max="10" />
     <button class="btn btn-primary mt-2" @onclick="Generate">Generate</button>
@@ -35,17 +35,15 @@
 }
 
 @code {
-    private string startDateString = DateTime.Today.ToString("yyyy-MM-dd");
-    private string endDateString = DateTime.Today.ToString("yyyy-MM-dd");
+    private DateTime startDate = DateTime.Today;
+    private DateTime endDate = DateTime.Today;
     private int mealsPerDay = 3;
     private MealSchedule? generatedSchedule;
     private bool canSave = false;
 
     private async Task Generate()
     {
-        var start = DateTime.Parse(startDateString);
-        var end = DateTime.Parse(endDateString);
-        generatedSchedule = await ScheduleService.GenerateScheduleAsync(start, end, mealsPerDay);
+        generatedSchedule = await ScheduleService.GenerateScheduleAsync(startDate, endDate, mealsPerDay);
         canSave = generatedSchedule != null && generatedSchedule.ScheduleEntries.Any();
     }
 

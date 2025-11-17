@@ -4,6 +4,7 @@ using MealForToday.UI.Data;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using MudBlazor.Services;
 
 namespace MealForToday.UI
 {
@@ -16,6 +17,9 @@ namespace MealForToday.UI
             // Add services to the container.
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
+
+            // Add MudBlazor services
+            builder.Services.AddMudServices();
 
             builder.Services.AddCascadingAuthenticationState();
             builder.Services.AddScoped<IdentityUserAccessor>();
