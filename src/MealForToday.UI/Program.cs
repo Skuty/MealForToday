@@ -54,8 +54,13 @@ namespace MealForToday.UI
                     db => db.Ingredients
                 )
             );
+            builder.Services.AddScoped<MealForToday.Application.Repositories.IInventoryRepository<MealForToday.Application.Models.UnitDefinition>>(
+                sp => new MealForToday.Application.Repositories.EfInventoryRepository<MealForToday.Application.Models.UnitDefinition>(
+                    sp.GetRequiredService<MealForToday.Application.ApplicationDbContext>(),
+                    db => db.UnitDefinitions
+                )
+            );
             builder.Services.AddScoped<MealForToday.Application.Repositories.IScheduleRepository, MealForToday.Application.Repositories.EfScheduleRepository>();
-            builder.Services.AddScoped<MealForToday.Application.Repositories.IUnitDefinitionRepository, MealForToday.Application.Repositories.EfUnitDefinitionRepository>();
 
             builder.Services.AddScoped<MealForToday.Application.Services.IMealService, MealForToday.Application.Services.MealService>();
             builder.Services.AddScoped<MealForToday.Application.Services.IIngredientService, MealForToday.Application.Services.IngredientService>();

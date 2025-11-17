@@ -23,7 +23,7 @@ namespace MealForToday.Application.Tests
         public async Task CanCreateAndRetrieveUnitDefinition()
         {
             using var db = CreateContext();
-            var repo = new EfUnitDefinitionRepository(db);
+            var repo = new EfInventoryRepository<UnitDefinition>(db, ctx => ctx.UnitDefinitions);
             var service = new UnitDefinitionService(repo);
 
             var unit = new UnitDefinition
@@ -35,9 +35,9 @@ namespace MealForToday.Application.Tests
                 IsStandard = true
             };
 
-            await service.CreateAsync(unit);
+            await repo.AddAsync(unit);
 
-            var all = await service.GetAllAsync();
+            var all = await repo.GetAllAsync();
             Assert.Single(all);
             Assert.Equal("Kilogram", all[0].Name);
             Assert.Equal(1, all[0].BaseAmount);
@@ -47,7 +47,7 @@ namespace MealForToday.Application.Tests
         public async Task CanGetUnitByCode()
         {
             using var db = CreateContext();
-            var repo = new EfUnitDefinitionRepository(db);
+            var repo = new EfInventoryRepository<UnitDefinition>(db, ctx => ctx.UnitDefinitions);
             var service = new UnitDefinitionService(repo);
 
             var unit = new UnitDefinition
@@ -58,7 +58,7 @@ namespace MealForToday.Application.Tests
                 MeasurementType = "Weight"
             };
 
-            await service.CreateAsync(unit);
+            await repo.AddAsync(unit);
 
             var retrieved = await service.GetByCodeAsync("g");
             Assert.NotNull(retrieved);
@@ -70,12 +70,12 @@ namespace MealForToday.Application.Tests
         public async Task SeedStandardUnitsCreatesExpectedUnits()
         {
             using var db = CreateContext();
-            var repo = new EfUnitDefinitionRepository(db);
+            var repo = new EfInventoryRepository<UnitDefinition>(db, ctx => ctx.UnitDefinitions);
             var service = new UnitDefinitionService(repo);
 
             await service.SeedStandardUnitsAsync();
 
-            var all = await service.GetAllAsync();
+            var all = await repo.GetAllAsync();
             Assert.True(all.Count >= 4); // At least kg, g, l, ml
 
             var kg = await service.GetByCodeAsync("kg");
@@ -99,14 +99,14 @@ namespace MealForToday.Application.Tests
         public async Task SeedStandardUnitsDoesNotDuplicateExistingUnits()
         {
             using var db = CreateContext();
-            var repo = new EfUnitDefinitionRepository(db);
+            var repo = new EfInventoryRepository<UnitDefinition>(db, ctx => ctx.UnitDefinitions);
             var service = new UnitDefinitionService(repo);
 
             await service.SeedStandardUnitsAsync();
-            var countAfterFirstSeed = (await service.GetAllAsync()).Count;
+            var countAfterFirstSeed = (await repo.GetAllAsync()).Count;
 
             await service.SeedStandardUnitsAsync();
-            var countAfterSecondSeed = (await service.GetAllAsync()).Count;
+            var countAfterSecondSeed = (await repo.GetAllAsync()).Count;
 
             Assert.Equal(countAfterFirstSeed, countAfterSecondSeed);
         }
@@ -115,7 +115,7 @@ namespace MealForToday.Application.Tests
         public async Task CanUpdateUnitDefinition()
         {
             using var db = CreateContext();
-            var repo = new EfUnitDefinitionRepository(db);
+            var repo = new EfInventoryRepository<UnitDefinition>(db, ctx => ctx.UnitDefinitions);
             var service = new UnitDefinitionService(repo);
 
             var unit = new UnitDefinition
@@ -125,23 +125,23 @@ namespace MealForToday.Application.Tests
                 BaseAmount = 1
             };
 
-            await service.CreateAsync(unit);
+            await repo.AddAsync(unit);
 
             unit.Name = "Updated Test Unit";
             unit.BaseAmount = 2;
-            await service.UpdateAsync(unit);
+            await repo.UpdateAsync(unit);
 
-            var retrieved = await service.GetByIdAsync(unit.Id);
+            var retrieved = await repo.GetByIdAsync(unit.Id);
             Assert.NotNull(retrieved);
             Assert.Equal("Updated Test Unit", retrieved.Name);
             Assert.Equal(2, retrieved.BaseAmount);
         }
 
         [Fact]
-        public async Task CanDeleteUnitDefinition()
+        public async Task CanSoftDeleteUnitDefinition()
         {
             using var db = CreateContext();
-            var repo = new EfUnitDefinitionRepository(db);
+            var repo = new EfInventoryRepository<UnitDefinition>(db, ctx => ctx.UnitDefinitions);
             var service = new UnitDefinitionService(repo);
 
             var unit = new UnitDefinition
@@ -151,13 +151,21 @@ namespace MealForToday.Application.Tests
                 BaseAmount = 1
             };
 
-            await service.CreateAsync(unit);
+            await repo.AddAsync(unit);
             var id = unit.Id;
 
-            await service.DeleteAsync(id);
+            // Soft delete
+            await repo.DeleteAsync(id);
 
-            var retrieved = await service.GetByIdAsync(id);
-            Assert.Null(retrieved);
+            // Should not be in GetAll (query filter applies)
+            var all = await repo.GetAllAsync();
+            Assert.DoesNotContain(all, u => u.Id == id);
+
+            // Can still be retrieved with GetAllIncludingDeleted
+            var allIncludingDeleted = await repo.GetAllIncludingDeletedAsync();
+            var deletedUnit = allIncludingDeleted.FirstOrDefault(u => u.Id == id);
+            Assert.NotNull(deletedUnit);
+            Assert.True(deletedUnit.IsDeleted);
         }
     }
 }

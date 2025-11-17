@@ -1,5 +1,4 @@
-using System;
-using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using MealForToday.Application.Models;
 using MealForToday.Application.Repositories;
@@ -8,50 +7,26 @@ namespace MealForToday.Application.Services
 {
     public class UnitDefinitionService : IUnitDefinitionService
     {
-        private readonly IUnitDefinitionRepository _repo;
+        private readonly IInventoryRepository<UnitDefinition> _repo;
 
-        public UnitDefinitionService(IUnitDefinitionRepository repo)
+        public UnitDefinitionService(IInventoryRepository<UnitDefinition> repo)
         {
             _repo = repo;
         }
 
-        public Task CreateAsync(UnitDefinition unitDefinition)
+        public async Task<UnitDefinition?> GetByCodeAsync(string code)
         {
-            return _repo.AddAsync(unitDefinition);
-        }
-
-        public Task DeleteAsync(Guid id)
-        {
-            return _repo.DeleteAsync(id);
-        }
-
-        public Task<List<UnitDefinition>> GetAllAsync()
-        {
-            return _repo.GetAllAsync();
-        }
-
-        public Task<UnitDefinition?> GetByCodeAsync(string code)
-        {
-            return _repo.GetByCodeAsync(code);
-        }
-
-        public Task<UnitDefinition?> GetByIdAsync(Guid id)
-        {
-            return _repo.GetByIdAsync(id);
-        }
-
-        public Task UpdateAsync(UnitDefinition unitDefinition)
-        {
-            return _repo.UpdateAsync(unitDefinition);
+            var units = await _repo.GetAllAsync();
+            return units.FirstOrDefault(u => u.Code == code);
         }
 
         /// <summary>
         /// Seeds standard unit definitions into the database if they don't exist.
-        /// Based on requirements: Kilogram=1, Gram=100, Litre=1, Milliliters=1000
+        /// Based on requirements: Kilogram=1, Gram=1000, Litre=1, Milliliters=1000
         /// </summary>
         public async Task SeedStandardUnitsAsync()
         {
-            var standardUnits = new List<UnitDefinition>
+            var standardUnits = new[]
             {
                 new UnitDefinition
                 {
@@ -137,7 +112,7 @@ namespace MealForToday.Application.Services
 
             foreach (var unit in standardUnits)
             {
-                var existing = await _repo.GetByCodeAsync(unit.Code);
+                var existing = await GetByCodeAsync(unit.Code);
                 if (existing == null)
                 {
                     await _repo.AddAsync(unit);

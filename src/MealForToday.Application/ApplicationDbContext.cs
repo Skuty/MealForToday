@@ -53,6 +53,7 @@ namespace MealForToday.Application
                 b.Property(x => x.Name).IsRequired();
                 b.Property(x => x.BaseAmount).IsRequired();
                 b.HasIndex(x => x.Code).IsUnique();
+                b.HasQueryFilter(x => !x.IsDeleted);
             });
         }
     }
