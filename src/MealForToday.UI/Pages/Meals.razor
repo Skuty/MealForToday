@@ -1,177 +1,239 @@
 @page "/meals"
+@rendermode InteractiveServer
 @using MealForToday.Application.Models
 @using Microsoft.AspNetCore.Components.Authorization
 @inject MealForToday.Application.Services.IMealService MealService
 @inject MealForToday.Application.Services.IIngredientService IngredientService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
 
-<h3>Meals Management</h3>
+<PageTitle>Meals</PageTitle>
 
-<div class="mb-4">
-    <h4>@(editingMeal == null ? "Create New Meal" : "Edit Meal")</h4>
-    
-    <div class="mb-3">
-        <label class="form-label">Name *</label>
-        <input class="form-control" @bind="mealName" placeholder="e.g., Spaghetti Bolognese" />
-    </div>
-    
-    <div class="mb-3">
-        <label class="form-label">Description</label>
-        <textarea class="form-control" rows="2" @bind="mealDescription" placeholder="Brief description of the meal"></textarea>
-    </div>
-    
-    <div class="mb-3">
-        <label class="form-label">Cuisine Type</label>
-        <input class="form-control" @bind="mealCuisineType" placeholder="e.g., Italian, Chinese, American" />
-    </div>
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h3" GutterBottom="true">Meals Management</MudText>
+    <MudText Typo="Typo.body1" Class="mb-4">Create and manage your meal recipes</MudText>
 
-    <div class="mb-3">
-        <h5>Ingredients</h5>
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudText Typo="Typo.h5" GutterBottom="true">
+            @(editingMeal == null ? "Create New Meal" : "Edit Meal")
+        </MudText>
+        
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="mealName" 
+                              Label="Name" 
+                              Required="true"
+                              Placeholder="e.g., Spaghetti Bolognese"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="mealCuisineType" 
+                              Label="Cuisine Type" 
+                              Placeholder="e.g., Italian, Chinese, American"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="mealDescription" 
+                              Label="Description" 
+                              Lines="2"
+                              Placeholder="Brief description of the meal"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense" />
+            </MudItem>
+        </MudGrid>
+
+        <MudDivider Class="my-4" />
+
+        <MudText Typo="Typo.h6" GutterBottom="true">Ingredients</MudText>
         
         @if (mealIngredients.Any())
         {
-            <table class="table table-sm">
-                <thead>
-                    <tr>
-                        <th>Ingredient</th>
-                        <th>Quantity</th>
-                        <th>Unit</th>
-                        <th>Notes</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var mi in mealIngredients)
-                    {
-                        <tr>
-                            <td>@mi.IngredientName</td>
-                            <td>@mi.Quantity</td>
-                            <td>@mi.Unit</td>
-                            <td>@mi.Notes</td>
-                            <td>
-                                <button class="btn btn-sm btn-danger" @onclick="(() => RemoveMealIngredient(mi))">Remove</button>
-                            </td>
-                        </tr>
+            <MudTable Items="@mealIngredients" 
+                      Dense="true" 
+                      Hover="true" 
+                      Class="mb-3"
+                      Elevation="0">
+                <HeaderContent>
+                    <MudTh>Ingredient</MudTh>
+                    <MudTh>Quantity</MudTh>
+                    <MudTh>Unit</MudTh>
+                    <MudTh>Notes</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    @{
+                        var ingredient = context;
                     }
-                </tbody>
-            </table>
+                    <MudTd DataLabel="Ingredient">@ingredient.IngredientName</MudTd>
+                    <MudTd DataLabel="Quantity">@ingredient.Quantity</MudTd>
+                    <MudTd DataLabel="Unit">@ingredient.Unit</MudTd>
+                    <MudTd DataLabel="Notes">@ingredient.Notes</MudTd>
+                    <MudTd>
+                        <MudTooltip Text="Remove">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                          Color="Color.Error" 
+                                          Size="Size.Small"
+                                          OnClick="@(() => RemoveMealIngredient(ingredient))" />
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
         }
         else
         {
-            <p class="text-muted">No ingredients added yet. Add ingredients below.</p>
+            <MudAlert Severity="Severity.Normal" Class="mb-3">No ingredients added yet. Add ingredients below.</MudAlert>
         }
         
-        <div class="card mt-2">
-            <div class="card-body">
-                <h6 class="card-title">Add Ingredient</h6>
-                <div class="row">
-                    <div class="col-md-4">
-                        <label class="form-label">Ingredient *</label>
-                        <select class="form-select" @bind="selectedIngredientId">
-                            <option value="">Select ingredient...</option>
-                            @if (availableIngredients != null)
+        <MudPaper Class="pa-3" Outlined="true">
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Add Ingredient</MudText>
+            <MudGrid>
+                <MudItem xs="12" sm="4">
+                    <MudSelect @bind-Value="selectedIngredientId" 
+                               Label="Ingredient" 
+                               Required="true"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense">
+                        <MudSelectItem Value="@("")">Select ingredient...</MudSelectItem>
+                        @if (availableIngredients != null)
+                        {
+                            @foreach (var ing in availableIngredients)
                             {
-                                @foreach (var ing in availableIngredients)
-                                {
-                                    <option value="@ing.Id">@ing.Name (@ing.DefaultUnit)</option>
-                                }
+                                <MudSelectItem Value="@(ing.Id.ToString())">@ing.Name (@ing.DefaultUnit)</MudSelectItem>
                             }
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Quantity *</label>
-                        <input type="number" step="0.01" class="form-control" @bind="ingredientQuantity" placeholder="0" />
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Unit</label>
-                        <input class="form-control" @bind="ingredientUnit" placeholder="Uses ingredient's default unit" />
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Notes</label>
-                        <input class="form-control" @bind="ingredientNotes" placeholder="Optional notes" />
-                    </div>
-                </div>
-                <button class="btn btn-sm btn-success mt-2" @onclick="AddIngredient">Add to Meal</button>
-            </div>
-        </div>
-    </div>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudNumericField @bind-Value="ingredientQuantity" 
+                                    Label="Quantity" 
+                                    Required="true"
+                                    Variant="Variant.Outlined"
+                                    Margin="Margin.Dense"
+                                    Step="0.01M"
+                                    Min="0.01M" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="ingredientUnit" 
+                                 Label="Unit" 
+                                 Placeholder="Uses ingredient's default unit"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="ingredientNotes" 
+                                 Label="Notes" 
+                                 Placeholder="Optional notes"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+            <MudButton Variant="Variant.Filled" 
+                      Color="Color.Success" 
+                      OnClick="AddIngredient"
+                      StartIcon="@Icons.Material.Filled.Add"
+                      Size="Size.Small"
+                      Class="mt-2">
+                Add to Meal
+            </MudButton>
+        </MudPaper>
 
-    <div class="mb-3">
-        @if (editingMeal == null)
-        {
-            <button class="btn btn-primary" @onclick="CreateMeal">Create Meal</button>
-        }
-        else
-        {
-            <button class="btn btn-primary" @onclick="UpdateMeal">Update Meal</button>
-            <button class="btn btn-secondary ms-2" @onclick="CancelEdit">Cancel</button>
-        }
-    </div>
-    
-    @if (!string.IsNullOrEmpty(errorMessage))
-    {
-        <div class="alert alert-danger">@errorMessage</div>
-    }
-    @if (!string.IsNullOrEmpty(successMessage))
-    {
-        <div class="alert alert-success">@successMessage</div>
-    }
-</div>
-
-<h4>All Meals</h4>
-@if (meals == null)
-{
-    <p>Loading...</p>
-}
-else if (!meals.Any())
-{
-    <p>No meals yet. Create your first meal above!</p>
-}
-else
-{
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Cuisine</th>
-                <th>Ingredients</th>
-                <th>Author</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var m in meals)
+        <MudStack Row="true" Class="mt-4">
+            @if (editingMeal == null)
             {
-                <tr>
-                    <td>@m.Name</td>
-                    <td>@m.Description</td>
-                    <td>@m.CuisineType</td>
-                    <td>
-                        @if (m.Ingredients?.Any() ?? false)
-                        {
-                            <ul class="mb-0" style="font-size: 0.9em;">
-                                @foreach (var i in m.Ingredients)
-                                {
-                                    <li>@i.Quantity @i.Unit @(i.Ingredient?.Name ?? "Unknown")@(!string.IsNullOrEmpty(i.Notes) ? $" ({i.Notes})" : "")</li>
-                                }
-                            </ul>
-                        }
-                        else
-                        {
-                            <em>No ingredients</em>
-                        }
-                    </td>
-                    <td>@(m.AuthorId ?? "System")</td>
-                    <td>
-                        <button class="btn btn-sm btn-warning" @onclick="(() => EditMeal(m))">Edit</button>
-                        <button class="btn btn-sm btn-danger ms-1" @onclick="(() => DeleteMeal(m.Id))">Delete</button>
-                    </td>
-                </tr>
+                <MudButton Variant="Variant.Filled" 
+                          Color="Color.Primary" 
+                          OnClick="CreateMeal"
+                          StartIcon="@Icons.Material.Filled.RestaurantMenu">
+                    Create Meal
+                </MudButton>
             }
-        </tbody>
-    </table>
-}
+            else
+            {
+                <MudButton Variant="Variant.Filled" 
+                          Color="Color.Primary" 
+                          OnClick="UpdateMeal"
+                          StartIcon="@Icons.Material.Filled.Save">
+                    Update Meal
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" 
+                          Color="Color.Secondary" 
+                          OnClick="CancelEdit">
+                    Cancel
+                </MudButton>
+            }
+        </MudStack>
+    </MudPaper>
+
+    <MudText Typo="Typo.h5" GutterBottom="true" Class="mt-6">All Meals</MudText>
+    
+    @if (meals == null)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (!meals.Any())
+    {
+        <MudAlert Severity="Severity.Info">No meals yet. Create your first meal above!</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@meals" 
+                  Hover="true" 
+                  Striped="true" 
+                  Dense="true"
+                  Elevation="2">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Description</MudTh>
+                <MudTh>Cuisine</MudTh>
+                <MudTh>Ingredients</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                @{
+                    var meal = context;
+                }
+                <MudTd DataLabel="Name">
+                    <MudText Typo="Typo.body2"><strong>@meal.Name</strong></MudText>
+                </MudTd>
+                <MudTd DataLabel="Description">@meal.Description</MudTd>
+                <MudTd DataLabel="Cuisine">
+                    @if (!string.IsNullOrEmpty(meal.CuisineType))
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info">@meal.CuisineType</MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Ingredients">
+                    @if (meal.Ingredients?.Any() ?? false)
+                    {
+                        <MudText Typo="Typo.body2">
+                            @string.Join(", ", meal.Ingredients.Select(i => $"{i.Quantity} {i.Unit} {i.Ingredient?.Name ?? "Unknown"}"))
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary"><em>No ingredients</em></MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudTooltip Text="Edit">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                      Color="Color.Warning" 
+                                      Size="Size.Small"
+                                      OnClick="@(() => EditMeal(meal))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                      Color="Color.Error" 
+                                      Size="Size.Small"
+                                      OnClick="@(() => DeleteMeal(meal.Id))" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
 
 @code {
     private List<Meal>? meals;
@@ -188,8 +250,6 @@ else
     private string ingredientUnit = string.Empty;
     private string ingredientNotes = string.Empty;
     
-    private string errorMessage = string.Empty;
-    private string successMessage = string.Empty;
     private string? currentUserId;
 
     protected override async Task OnInitializedAsync()
@@ -213,25 +273,22 @@ else
 
     private void AddIngredient()
     {
-        errorMessage = string.Empty;
-        successMessage = string.Empty;
-
         if (string.IsNullOrWhiteSpace(selectedIngredientId))
         {
-            errorMessage = "Please select an ingredient.";
+            Snackbar.Add("Please select an ingredient.", Severity.Error);
             return;
         }
 
         if (ingredientQuantity <= 0)
         {
-            errorMessage = "Quantity must be greater than 0.";
+            Snackbar.Add("Quantity must be greater than 0.", Severity.Error);
             return;
         }
 
         var ingredient = availableIngredients?.FirstOrDefault(i => i.Id.ToString() == selectedIngredientId);
         if (ingredient == null)
         {
-            errorMessage = "Selected ingredient not found.";
+            Snackbar.Add("Selected ingredient not found.", Severity.Error);
             return;
         }
 
@@ -251,27 +308,27 @@ else
         ingredientQuantity = 0;
         ingredientUnit = string.Empty;
         ingredientNotes = string.Empty;
+        
+        Snackbar.Add($"Added {ingredient.Name} to meal", Severity.Success);
     }
 
     private void RemoveMealIngredient(MealIngredientDto mi)
     {
         mealIngredients.Remove(mi);
+        Snackbar.Add($"Removed {mi.IngredientName}", Severity.Info);
     }
 
     private async Task CreateMeal()
     {
-        errorMessage = string.Empty;
-        successMessage = string.Empty;
-
         if (string.IsNullOrWhiteSpace(mealName))
         {
-            errorMessage = "Meal name is required.";
+            Snackbar.Add("Meal name is required.", Severity.Error);
             return;
         }
 
         if (!mealIngredients.Any())
         {
-            errorMessage = "Please add at least one ingredient to the meal.";
+            Snackbar.Add("Please add at least one ingredient to the meal.", Severity.Error);
             return;
         }
 
@@ -291,7 +348,7 @@ else
         };
 
         await MealService.CreateAsync(meal);
-        successMessage = $"Meal '{meal.Name}' created successfully!";
+        Snackbar.Add($"Meal '{meal.Name}' created successfully!", Severity.Success);
         ClearForm();
         await LoadData();
     }
@@ -300,18 +357,15 @@ else
     {
         if (editingMeal == null) return;
 
-        errorMessage = string.Empty;
-        successMessage = string.Empty;
-
         if (string.IsNullOrWhiteSpace(mealName))
         {
-            errorMessage = "Meal name is required.";
+            Snackbar.Add("Meal name is required.", Severity.Error);
             return;
         }
 
         if (!mealIngredients.Any())
         {
-            errorMessage = "Please add at least one ingredient to the meal.";
+            Snackbar.Add("Please add at least one ingredient to the meal.", Severity.Error);
             return;
         }
 
@@ -327,7 +381,7 @@ else
         }).ToList();
 
         await MealService.UpdateAsync(editingMeal);
-        successMessage = $"Meal '{editingMeal.Name}' updated successfully!";
+        Snackbar.Add($"Meal '{editingMeal.Name}' updated successfully!", Severity.Success);
         ClearForm();
         await LoadData();
     }
@@ -352,9 +406,6 @@ else
                 Notes = mi.Notes ?? string.Empty
             }).ToList();
         }
-        
-        errorMessage = string.Empty;
-        successMessage = string.Empty;
     }
 
     private void CancelEdit()
@@ -365,7 +416,7 @@ else
     private async Task DeleteMeal(Guid id)
     {
         await MealService.DeleteAsync(id);
-        successMessage = "Meal deleted successfully!";
+        Snackbar.Add("Meal deleted successfully!", Severity.Info);
         await LoadData();
     }
 
@@ -380,8 +431,6 @@ else
         ingredientQuantity = 0;
         ingredientUnit = string.Empty;
         ingredientNotes = string.Empty;
-        errorMessage = string.Empty;
-        successMessage = string.Empty;
     }
 
     // DTO for managing ingredients in the UI

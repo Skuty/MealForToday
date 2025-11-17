@@ -1,100 +1,156 @@
 @page "/ingredients"
+@rendermode InteractiveServer
 @using MealForToday.Application.Models
 @inject MealForToday.Application.Services.IIngredientService IngredientService
+@inject ISnackbar Snackbar
 
-<h3>Ingredients Management</h3>
+<PageTitle>Ingredients</PageTitle>
 
-<div class="mb-4">
-    <h4>@(editingIngredient == null ? "Add New Ingredient" : "Edit Ingredient")</h4>
-    <div class="mb-3">
-        <label class="form-label">Name *</label>
-        <input class="form-control" @bind="ingredientName" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Description</label>
-        <textarea class="form-control" rows="2" @bind="ingredientDescription"></textarea>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Category</label>
-        <input class="form-control" @bind="ingredientCategory" placeholder="e.g., Vegetable, Protein, Dairy" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Default Measurement Unit *</label>
-        <select class="form-select" @bind="ingredientDefaultUnit">
-            <option value="">Select unit...</option>
-            <option value="g">g (grams)</option>
-            <option value="kg">kg (kilograms)</option>
-            <option value="ml">ml (milliliters)</option>
-            <option value="l">l (liters)</option>
-            <option value="tbsp">tbsp (tablespoon)</option>
-            <option value="tsp">tsp (teaspoon)</option>
-            <option value="cup">cup</option>
-            <option value="piece">piece</option>
-            <option value="oz">oz (ounce)</option>
-            <option value="lb">lb (pound)</option>
-        </select>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Calories per 100g (optional)</label>
-        <input type="number" step="0.01" class="form-control" @bind="ingredientCalories" />
-    </div>
-    <div class="mb-3">
-        @if (editingIngredient == null)
-        {
-            <button class="btn btn-primary" @onclick="CreateIngredient">Add Ingredient</button>
-        }
-        else
-        {
-            <button class="btn btn-primary" @onclick="UpdateIngredient">Update Ingredient</button>
-            <button class="btn btn-secondary ms-2" @onclick="CancelEdit">Cancel</button>
-        }
-    </div>
-    @if (!string.IsNullOrEmpty(errorMessage))
-    {
-        <div class="alert alert-danger">@errorMessage</div>
-    }
-</div>
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h3" GutterBottom="true">Ingredients Management</MudText>
+    <MudText Typo="Typo.body1" Class="mb-4">Manage your ingredient library for meal planning</MudText>
 
-<h4>All Ingredients</h4>
-@if (ingredients == null)
-{
-    <p>Loading...</p>
-}
-else if (!ingredients.Any())
-{
-    <p>No ingredients yet. Add your first ingredient above!</p>
-}
-else
-{
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th>Default Unit</th>
-                <th>Calories/100g</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var ingredient in ingredients)
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudText Typo="Typo.h5" GutterBottom="true">
+            @(editingIngredient == null ? "Add New Ingredient" : "Edit Ingredient")
+        </MudText>
+        
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="ingredientName" 
+                              Label="Name" 
+                              Required="true"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="ingredientCategory" 
+                              Label="Category" 
+                              Placeholder="e.g., Vegetable, Protein, Dairy"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="ingredientDescription" 
+                              Label="Description" 
+                              Lines="2"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect @bind-Value="ingredientDefaultUnit" 
+                           Label="Default Measurement Unit" 
+                           Required="true"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense">
+                    <MudSelectItem Value="@("")">Select unit...</MudSelectItem>
+                    <MudSelectItem Value="@("g")">g (grams)</MudSelectItem>
+                    <MudSelectItem Value="@("kg")">kg (kilograms)</MudSelectItem>
+                    <MudSelectItem Value="@("ml")">ml (milliliters)</MudSelectItem>
+                    <MudSelectItem Value="@("l")">l (liters)</MudSelectItem>
+                    <MudSelectItem Value="@("tbsp")">tbsp (tablespoon)</MudSelectItem>
+                    <MudSelectItem Value="@("tsp")">tsp (teaspoon)</MudSelectItem>
+                    <MudSelectItem Value="@("cup")">cup</MudSelectItem>
+                    <MudSelectItem Value="@("piece")">piece</MudSelectItem>
+                    <MudSelectItem Value="@("oz")">oz (ounce)</MudSelectItem>
+                    <MudSelectItem Value="@("lb")">lb (pound)</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="ingredientCalories" 
+                                Label="Calories per 100g (optional)" 
+                                Variant="Variant.Outlined"
+                                Margin="Margin.Dense"
+                                Step="0.01M" />
+            </MudItem>
+        </MudGrid>
+
+        <MudStack Row="true" Class="mt-4">
+            @if (editingIngredient == null)
             {
-                <tr>
-                    <td>@ingredient.Name</td>
-                    <td>@ingredient.Description</td>
-                    <td>@ingredient.Category</td>
-                    <td>@ingredient.DefaultUnit</td>
-                    <td>@(ingredient.CaloriesPer100g?.ToString("F2") ?? "-")</td>
-                    <td>
-                        <button class="btn btn-sm btn-warning" @onclick="(() => EditIngredient(ingredient))">Edit</button>
-                        <button class="btn btn-sm btn-danger ms-1" @onclick="(() => DeleteIngredient(ingredient.Id))">Delete</button>
-                    </td>
-                </tr>
+                <MudButton Variant="Variant.Filled" 
+                          Color="Color.Primary" 
+                          OnClick="CreateIngredient"
+                          StartIcon="@Icons.Material.Filled.Add">
+                    Add Ingredient
+                </MudButton>
             }
-        </tbody>
-    </table>
-}
+            else
+            {
+                <MudButton Variant="Variant.Filled" 
+                          Color="Color.Primary" 
+                          OnClick="UpdateIngredient"
+                          StartIcon="@Icons.Material.Filled.Save">
+                    Update Ingredient
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" 
+                          Color="Color.Secondary" 
+                          OnClick="CancelEdit">
+                    Cancel
+                </MudButton>
+            }
+        </MudStack>
+    </MudPaper>
+
+    <MudText Typo="Typo.h5" GutterBottom="true" Class="mt-6">All Ingredients</MudText>
+    
+    @if (ingredients == null)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (!ingredients.Any())
+    {
+        <MudAlert Severity="Severity.Info">No ingredients yet. Add your first ingredient above!</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@ingredients" 
+                  Hover="true" 
+                  Striped="true" 
+                  Dense="true"
+                  Elevation="2">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Description</MudTh>
+                <MudTh>Category</MudTh>
+                <MudTh>Default Unit</MudTh>
+                <MudTh>Calories/100g</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                @{
+                    var ingredient = context;
+                }
+                <MudTd DataLabel="Name">
+                    <MudText Typo="Typo.body2"><strong>@ingredient.Name</strong></MudText>
+                </MudTd>
+                <MudTd DataLabel="Description">@ingredient.Description</MudTd>
+                <MudTd DataLabel="Category">
+                    @if (!string.IsNullOrEmpty(ingredient.Category))
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary">@ingredient.Category</MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Default Unit">@ingredient.DefaultUnit</MudTd>
+                <MudTd DataLabel="Calories/100g">@(ingredient.CaloriesPer100g?.ToString("F2") ?? "-")</MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudTooltip Text="Edit">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                      Color="Color.Warning" 
+                                      Size="Size.Small"
+                                      OnClick="@(() => EditIngredient(ingredient))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                      Color="Color.Error" 
+                                      Size="Size.Small"
+                                      OnClick="@(() => DeleteIngredient(ingredient.Id))" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
 
 @code {
     private List<Ingredient>? ingredients;
@@ -104,7 +160,6 @@ else
     private string ingredientCategory = string.Empty;
     private string ingredientDefaultUnit = string.Empty;
     private decimal? ingredientCalories;
-    private string errorMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -118,17 +173,15 @@ else
 
     private async Task CreateIngredient()
     {
-        errorMessage = string.Empty;
-
         if (string.IsNullOrWhiteSpace(ingredientName))
         {
-            errorMessage = "Name is required.";
+            Snackbar.Add("Name is required.", Severity.Error);
             return;
         }
 
         if (string.IsNullOrWhiteSpace(ingredientDefaultUnit))
         {
-            errorMessage = "Default measurement unit is required.";
+            Snackbar.Add("Default measurement unit is required.", Severity.Error);
             return;
         }
 
@@ -143,6 +196,7 @@ else
         };
 
         await IngredientService.CreateAsync(ingredient);
+        Snackbar.Add($"Ingredient '{ingredient.Name}' added successfully!", Severity.Success);
         ClearForm();
         await LoadIngredients();
     }
@@ -151,17 +205,15 @@ else
     {
         if (editingIngredient == null) return;
 
-        errorMessage = string.Empty;
-
         if (string.IsNullOrWhiteSpace(ingredientName))
         {
-            errorMessage = "Name is required.";
+            Snackbar.Add("Name is required.", Severity.Error);
             return;
         }
 
         if (string.IsNullOrWhiteSpace(ingredientDefaultUnit))
         {
-            errorMessage = "Default measurement unit is required.";
+            Snackbar.Add("Default measurement unit is required.", Severity.Error);
             return;
         }
 
@@ -172,6 +224,7 @@ else
         editingIngredient.CaloriesPer100g = ingredientCalories;
 
         await IngredientService.UpdateAsync(editingIngredient);
+        Snackbar.Add($"Ingredient '{editingIngredient.Name}' updated successfully!", Severity.Success);
         ClearForm();
         await LoadIngredients();
     }
@@ -184,7 +237,6 @@ else
         ingredientCategory = ingredient.Category ?? string.Empty;
         ingredientDefaultUnit = ingredient.DefaultUnit ?? string.Empty;
         ingredientCalories = ingredient.CaloriesPer100g;
-        errorMessage = string.Empty;
     }
 
     private void CancelEdit()
@@ -195,6 +247,7 @@ else
     private async Task DeleteIngredient(Guid id)
     {
         await IngredientService.DeleteAsync(id);
+        Snackbar.Add("Ingredient deleted successfully!", Severity.Info);
         await LoadIngredients();
     }
 
@@ -206,6 +259,5 @@ else
         ingredientCategory = string.Empty;
         ingredientDefaultUnit = string.Empty;
         ingredientCalories = null;
-        errorMessage = string.Empty;
     }
 }
