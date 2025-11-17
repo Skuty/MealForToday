@@ -1,33 +1,144 @@
 @page "/meals"
 @using MealForToday.Application.Models
+@using Microsoft.AspNetCore.Components.Authorization
 @inject MealForToday.Application.Services.IMealService MealService
+@inject MealForToday.Application.Services.IIngredientService IngredientService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
-<h3>Meals</h3>
+<h3>Meals Management</h3>
 
-<div class="mb-3">
-    <label class="form-label">Name</label>
-    <input class="form-control" @bind="newName" />
-    <label class="form-label mt-2">Description</label>
-    <input class="form-control" @bind="newDescription" />
-    <label class="form-label mt-2">Ingredients (one per line: name|quantity|unit)</label>
-    <textarea class="form-control" rows="4" @bind="newIngredientsText"></textarea>
-    <button class="btn btn-primary mt-2" @onclick="CreateMeal">Create Meal</button>
+<div class="mb-4">
+    <h4>@(editingMeal == null ? "Create New Meal" : "Edit Meal")</h4>
+    
+    <div class="mb-3">
+        <label class="form-label">Name *</label>
+        <input class="form-control" @bind="mealName" placeholder="e.g., Spaghetti Bolognese" />
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" rows="2" @bind="mealDescription" placeholder="Brief description of the meal"></textarea>
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Cuisine Type</label>
+        <input class="form-control" @bind="mealCuisineType" placeholder="e.g., Italian, Chinese, American" />
+    </div>
+
+    <div class="mb-3">
+        <h5>Ingredients</h5>
+        
+        @if (mealIngredients.Any())
+        {
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Ingredient</th>
+                        <th>Quantity</th>
+                        <th>Unit</th>
+                        <th>Notes</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var mi in mealIngredients)
+                    {
+                        <tr>
+                            <td>@mi.IngredientName</td>
+                            <td>@mi.Quantity</td>
+                            <td>@mi.Unit</td>
+                            <td>@mi.Notes</td>
+                            <td>
+                                <button class="btn btn-sm btn-danger" @onclick="(() => RemoveMealIngredient(mi))">Remove</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p class="text-muted">No ingredients added yet. Add ingredients below.</p>
+        }
+        
+        <div class="card mt-2">
+            <div class="card-body">
+                <h6 class="card-title">Add Ingredient</h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Ingredient *</label>
+                        <select class="form-select" @bind="selectedIngredientId">
+                            <option value="">Select ingredient...</option>
+                            @if (availableIngredients != null)
+                            {
+                                @foreach (var ing in availableIngredients)
+                                {
+                                    <option value="@ing.Id">@ing.Name (@ing.DefaultUnit)</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Quantity *</label>
+                        <input type="number" step="0.01" class="form-control" @bind="ingredientQuantity" placeholder="0" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Unit</label>
+                        <input class="form-control" @bind="ingredientUnit" placeholder="Uses ingredient's default unit" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Notes</label>
+                        <input class="form-control" @bind="ingredientNotes" placeholder="Optional notes" />
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-success mt-2" @onclick="AddIngredient">Add to Meal</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        @if (editingMeal == null)
+        {
+            <button class="btn btn-primary" @onclick="CreateMeal">Create Meal</button>
+        }
+        else
+        {
+            <button class="btn btn-primary" @onclick="UpdateMeal">Update Meal</button>
+            <button class="btn btn-secondary ms-2" @onclick="CancelEdit">Cancel</button>
+        }
+    </div>
+    
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
 </div>
 
-<h4>Preferred Meals</h4>
+<h4>All Meals</h4>
 @if (meals == null)
 {
     <p>Loading...</p>
 }
 else if (!meals.Any())
 {
-    <p>No meals yet.</p>
+    <p>No meals yet. Create your first meal above!</p>
 }
 else
 {
-    <table class="table">
+    <table class="table table-striped">
         <thead>
-            <tr><th>Name</th><th>Description</th><th>Ingredients</th><th></th></tr>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Cuisine</th>
+                <th>Ingredients</th>
+                <th>Author</th>
+                <th>Actions</th>
+            </tr>
         </thead>
         <tbody>
             @foreach (var m in meals)
@@ -35,19 +146,26 @@ else
                 <tr>
                     <td>@m.Name</td>
                     <td>@m.Description</td>
+                    <td>@m.CuisineType</td>
                     <td>
                         @if (m.Ingredients?.Any() ?? false)
                         {
-                            <ul>
+                            <ul class="mb-0" style="font-size: 0.9em;">
                                 @foreach (var i in m.Ingredients)
                                 {
-                                    <li>@(i.Ingredient?.Name ?? "Unknown") - @i.Quantity @i.Unit</li>
+                                    <li>@i.Quantity @i.Unit @(i.Ingredient?.Name ?? "Unknown")@(!string.IsNullOrEmpty(i.Notes) ? $" ({i.Notes})" : "")</li>
                                 }
                             </ul>
                         }
+                        else
+                        {
+                            <em>No ingredients</em>
+                        }
                     </td>
+                    <td>@(m.AuthorId ?? "System")</td>
                     <td>
-                        <button class="btn btn-sm btn-danger" @onclick="(() => DeleteMeal(m.Id))">Delete</button>
+                        <button class="btn btn-sm btn-warning" @onclick="(() => EditMeal(m))">Edit</button>
+                        <button class="btn btn-sm btn-danger ms-1" @onclick="(() => DeleteMeal(m.Id))">Delete</button>
                     </td>
                 </tr>
             }
@@ -57,49 +175,222 @@ else
 
 @code {
     private List<Meal>? meals;
-    private string newName = string.Empty;
-    private string newDescription = string.Empty;
-    private string newIngredientsText = string.Empty;
+    private List<Ingredient>? availableIngredients;
+    private Meal? editingMeal;
+    
+    private string mealName = string.Empty;
+    private string mealDescription = string.Empty;
+    private string mealCuisineType = string.Empty;
+    private List<MealIngredientDto> mealIngredients = new();
+    
+    private string selectedIngredientId = string.Empty;
+    private decimal ingredientQuantity = 0;
+    private string ingredientUnit = string.Empty;
+    private string ingredientNotes = string.Empty;
+    
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private string? currentUserId;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadData();
+        
+        // Get current user
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            currentUserId = user.Identity.Name ?? user.FindFirst(c => c.Type.Contains("nameidentifier"))?.Value;
+        }
+    }
+
+    private async Task LoadData()
+    {
         meals = await MealService.GetAllAsync();
+        availableIngredients = await IngredientService.GetAllAsync();
+    }
+
+    private void AddIngredient()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(selectedIngredientId))
+        {
+            errorMessage = "Please select an ingredient.";
+            return;
+        }
+
+        if (ingredientQuantity <= 0)
+        {
+            errorMessage = "Quantity must be greater than 0.";
+            return;
+        }
+
+        var ingredient = availableIngredients?.FirstOrDefault(i => i.Id.ToString() == selectedIngredientId);
+        if (ingredient == null)
+        {
+            errorMessage = "Selected ingredient not found.";
+            return;
+        }
+
+        var unit = string.IsNullOrWhiteSpace(ingredientUnit) ? ingredient.DefaultUnit : ingredientUnit;
+
+        mealIngredients.Add(new MealIngredientDto
+        {
+            IngredientId = ingredient.Id,
+            IngredientName = ingredient.Name,
+            Quantity = ingredientQuantity,
+            Unit = unit ?? string.Empty,
+            Notes = ingredientNotes
+        });
+
+        // Clear ingredient form
+        selectedIngredientId = string.Empty;
+        ingredientQuantity = 0;
+        ingredientUnit = string.Empty;
+        ingredientNotes = string.Empty;
+    }
+
+    private void RemoveMealIngredient(MealIngredientDto mi)
+    {
+        mealIngredients.Remove(mi);
     }
 
     private async Task CreateMeal()
     {
-        var meal = new Meal
-        {
-            Name = newName,
-            Description = newDescription
-        };
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
 
-        var lines = (newIngredientsText ?? string.Empty).Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-        foreach (var line in lines)
+        if (string.IsNullOrWhiteSpace(mealName))
         {
-            var parts = line.Split('|');
-            var name = parts.Length > 0 ? parts[0].Trim() : string.Empty;
-            decimal qty = 0;
-            if (parts.Length > 1) decimal.TryParse(parts[1].Trim(), out qty);
-            var unit = parts.Length > 2 ? parts[2].Trim() : string.Empty;
-            meal.Ingredients.Add(new MealIngredient
-            {
-                Ingredient = new Ingredient { Name = name },
-                Quantity = qty,
-                Unit = unit
-            });
+            errorMessage = "Meal name is required.";
+            return;
         }
 
+        if (!mealIngredients.Any())
+        {
+            errorMessage = "Please add at least one ingredient to the meal.";
+            return;
+        }
+
+        var meal = new Meal
+        {
+            Name = mealName.Trim(),
+            Description = string.IsNullOrWhiteSpace(mealDescription) ? null : mealDescription.Trim(),
+            CuisineType = string.IsNullOrWhiteSpace(mealCuisineType) ? null : mealCuisineType.Trim(),
+            AuthorId = currentUserId,
+            Ingredients = mealIngredients.Select(mi => new MealIngredient
+            {
+                IngredientId = mi.IngredientId,
+                Quantity = mi.Quantity,
+                Unit = mi.Unit,
+                Notes = string.IsNullOrWhiteSpace(mi.Notes) ? null : mi.Notes.Trim()
+            }).ToList()
+        };
+
         await MealService.CreateAsync(meal);
-        newName = string.Empty;
-        newDescription = string.Empty;
-        newIngredientsText = string.Empty;
-        meals = await MealService.GetAllAsync();
+        successMessage = $"Meal '{meal.Name}' created successfully!";
+        ClearForm();
+        await LoadData();
+    }
+
+    private async Task UpdateMeal()
+    {
+        if (editingMeal == null) return;
+
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(mealName))
+        {
+            errorMessage = "Meal name is required.";
+            return;
+        }
+
+        if (!mealIngredients.Any())
+        {
+            errorMessage = "Please add at least one ingredient to the meal.";
+            return;
+        }
+
+        editingMeal.Name = mealName.Trim();
+        editingMeal.Description = string.IsNullOrWhiteSpace(mealDescription) ? null : mealDescription.Trim();
+        editingMeal.CuisineType = string.IsNullOrWhiteSpace(mealCuisineType) ? null : mealCuisineType.Trim();
+        editingMeal.Ingredients = mealIngredients.Select(mi => new MealIngredient
+        {
+            IngredientId = mi.IngredientId,
+            Quantity = mi.Quantity,
+            Unit = mi.Unit,
+            Notes = string.IsNullOrWhiteSpace(mi.Notes) ? null : mi.Notes.Trim()
+        }).ToList();
+
+        await MealService.UpdateAsync(editingMeal);
+        successMessage = $"Meal '{editingMeal.Name}' updated successfully!";
+        ClearForm();
+        await LoadData();
+    }
+
+    private async Task EditMeal(Meal meal)
+    {
+        editingMeal = meal;
+        mealName = meal.Name;
+        mealDescription = meal.Description ?? string.Empty;
+        mealCuisineType = meal.CuisineType ?? string.Empty;
+        
+        // Load the meal with ingredients
+        var fullMeal = await MealService.GetByIdAsync(meal.Id);
+        if (fullMeal != null && fullMeal.Ingredients != null)
+        {
+            mealIngredients = fullMeal.Ingredients.Select(mi => new MealIngredientDto
+            {
+                IngredientId = mi.IngredientId,
+                IngredientName = mi.Ingredient?.Name ?? "Unknown",
+                Quantity = mi.Quantity,
+                Unit = mi.Unit ?? string.Empty,
+                Notes = mi.Notes ?? string.Empty
+            }).ToList();
+        }
+        
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void CancelEdit()
+    {
+        ClearForm();
     }
 
     private async Task DeleteMeal(Guid id)
     {
         await MealService.DeleteAsync(id);
-        meals = await MealService.GetAllAsync();
+        successMessage = "Meal deleted successfully!";
+        await LoadData();
+    }
+
+    private void ClearForm()
+    {
+        editingMeal = null;
+        mealName = string.Empty;
+        mealDescription = string.Empty;
+        mealCuisineType = string.Empty;
+        mealIngredients.Clear();
+        selectedIngredientId = string.Empty;
+        ingredientQuantity = 0;
+        ingredientUnit = string.Empty;
+        ingredientNotes = string.Empty;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    // DTO for managing ingredients in the UI
+    private class MealIngredientDto
+    {
+        public Guid IngredientId { get; set; }
+        public string IngredientName { get; set; } = string.Empty;
+        public decimal Quantity { get; set; }
+        public string Unit { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
     }
 }

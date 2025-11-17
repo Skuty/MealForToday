@@ -55,10 +55,12 @@ namespace MealForToday.UI
                 )
             );
             builder.Services.AddScoped<MealForToday.Application.Repositories.IScheduleRepository, MealForToday.Application.Repositories.EfScheduleRepository>();
+            builder.Services.AddScoped<MealForToday.Application.Repositories.IUnitDefinitionRepository, MealForToday.Application.Repositories.EfUnitDefinitionRepository>();
 
             builder.Services.AddScoped<MealForToday.Application.Services.IMealService, MealForToday.Application.Services.MealService>();
             builder.Services.AddScoped<MealForToday.Application.Services.IIngredientService, MealForToday.Application.Services.IngredientService>();
             builder.Services.AddScoped<MealForToday.Application.Services.IScheduleService, MealForToday.Application.Services.ScheduleService>();
+            builder.Services.AddScoped<MealForToday.Application.Services.IUnitDefinitionService, MealForToday.Application.Services.UnitDefinitionService>();
 
             var app = builder.Build();
 
@@ -71,6 +73,10 @@ namespace MealForToday.UI
                 {
                     var appDb = provider.GetRequiredService<MealForToday.Application.ApplicationDbContext>();
                     appDb.Database.EnsureCreated();
+
+                    // Seed standard unit definitions
+                    var unitService = provider.GetRequiredService<MealForToday.Application.Services.IUnitDefinitionService>();
+                    unitService.SeedStandardUnitsAsync().GetAwaiter().GetResult();
 
                     // Seed sample domain data if empty
                     if (!appDb.Meals.Any() && !appDb.Ingredients.Any())
