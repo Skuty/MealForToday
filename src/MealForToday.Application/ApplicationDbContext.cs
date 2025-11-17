@@ -12,6 +12,7 @@ namespace MealForToday.Application
         public DbSet<Meal> Meals { get; set; }
         public DbSet<Ingredient> Ingredients { get; set; }
         public DbSet<MealSchedule> MealSchedules { get; set; }
+        public DbSet<UnitDefinition> UnitDefinitions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -43,6 +44,16 @@ namespace MealForToday.Application
                     sb.WithOwner().HasForeignKey("MealScheduleId");
                     sb.Property<Guid>("Id");
                 });
+            });
+
+            modelBuilder.Entity<UnitDefinition>(b =>
+            {
+                b.HasKey(x => x.Id);
+                b.Property(x => x.Code).IsRequired();
+                b.Property(x => x.Name).IsRequired();
+                b.Property(x => x.BaseAmount).IsRequired();
+                b.HasIndex(x => x.Code).IsUnique();
+                b.HasQueryFilter(x => !x.IsDeleted);
             });
         }
     }
