@@ -27,7 +27,12 @@ This is a quick reference for deploying your PR branch for testing.
    - Use demo credentials (see below)
 
 4. **Cleanup When Done**:
-   - Run workflow again with Action: `cleanup`
+   - Go to [Actions → Cleanup Azure Environments](../../actions/workflows/cleanup-azure.yml)
+   - Click "Run workflow"
+   - Configure:
+     - Environment: `test`
+     - Branch: Your PR branch
+   - Click "Run workflow"
    - Removes ALL container apps in the specified environment
 
 ## Alternative: Deploy Locally with Docker
